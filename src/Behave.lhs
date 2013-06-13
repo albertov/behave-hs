@@ -59,44 +59,29 @@ O lo que es lo mismo: la carga de combustible es una masa dividida entre un area
 
 De la misma manera se definen tipos para dimensiones
 
-> type DSurfaceAreaToVolume   = Dim Neg1 Zero Zero Zero Zero Zero Zero
+> type DSaToVolRatio          = Dim Neg1 Zero Zero Zero Zero Zero Zero
 > type DDensity               = Dim Neg3 Pos1 Zero Zero Zero Zero Zero
 > type DHeatOfCombustion      = Dim Pos2 Zero Neg2 Zero Zero Zero Zero
 > type DHeatPerUnitArea       = Dim Zero Pos1 Neg2 Zero Zero Zero Zero
+> type DReactionVelocity      = Dim Zero Zero Neg1 Zero Zero Zero Zero
 
 Y ahora los tipos para las cantidades (dimensión asociada a un valor)
 
-> type FuelLoad               = Quantity DFuelLoad Double
-> type SurfaceAreaToVolume    = Quantity DSurfaceAreaToVolume Double
-> type Density                = Quantity DDensity Double
-> type HeatOfCombustion       = Quantity DHeatOfCombustion Double
-> type HeatPerUnitArea        = Quantity DHeatPerUnitArea Double
-> type Fraction               = Dimensionless Double
-> type Moisture               = Fraction
-> type TotalSilicaContent     = Fraction
-> type EffectiveSilicaContent = Fraction
-
-
-A continuación se definen tipos para las unidades del sistema imperial en las que
-el programa original trabaja. La librería Dimensions se encarga de la conversión
-desde y hacia el sistema métrico internacional.
-
-> lbSqFt :: Unit DFuelLoad Double
-> lbSqFt = poundMass/(foot ^ pos2)
-
-> lbCuFt :: Unit DDensity Double
-> lbCuFt = poundMass/(foot ^ pos3)
-
-> wattHour, btu:: Unit DEnergy Double
-> wattHour = watt * hour
-> btu = prefix 0.293071 wattHour
-
-> btuLb:: Unit DHeatOfCombustion Double
-> btuLb = btu / poundMass
-
-> perFoot :: Unit DSurfaceAreaToVolume Double
-> perFoot  = foot ^ neg1
-
+> type FuelLoad                = Quantity DFuelLoad Double
+> type SaToVolRatio            = Quantity DSaToVolRatio Double
+> type Density                 = Quantity DDensity Double
+> type HeatOfCombustion        = Quantity DHeatOfCombustion Double
+> type HeatPerUnitArea         = Quantity DHeatPerUnitArea Double
+> type ReactionVelocity        = Quantity DReactionVelocity Double
+> type Fraction                = Dimensionless Double
+> type Moisture                = Fraction
+> type TotalMineralContent     = Fraction
+> type EffectiveMineralContent = Fraction
+> type Speed                   = Velocity Double
+> type RateOfSpread            = Speed
+> type Azimuth                 = PlaneAngle Double
+> type Slope                   = Fraction
+> type ReactionIntensity       = HeatFluxDensity Double
 
 Definimos el tipo de partícula. Éste puede tomar los valores de "muerto",
 "herbaceo" o "leñoso".
@@ -109,25 +94,23 @@ intrínsecos.
 > data Particle = Particle {
 >     type_:: ParticleType,
 >     load :: FuelLoad,
->     savr :: SurfaceAreaToVolume,
+>     savr :: SaToVolRatio,
 >     dens :: Density,
 >     heat :: HeatOfCombustion,
->     stot :: TotalSilicaContent,
->     seff :: EffectiveSilicaContent
+>     mtot :: TotalMineralContent,
+>     meff :: EffectiveMineralContent
 > } deriving (Eq, Show)
 
 Una partícula está viva si es de tipo herbaceo o leñoso
 
 > isAlive :: Particle -> Bool
-> isAlive (Particle Dead _ _ _ _ _ _ ) = False
-> isAlive (Particle Herb _ _ _ _ _ _ ) = True
-> isAlive (Particle Wood _ _ _ _ _ _ ) = True
+> isAlive p = type_ p /= Dead
 
 
 Hacemos una función pata construir una partícula de manera cómoda estableciendo
 algunos parámetros por defecto.
 
-> mkParticle :: ParticleType -> FuelLoad -> SurfaceAreaToVolume -> Particle
+> mkParticle :: ParticleType -> FuelLoad -> SaToVolRatio -> Particle
 > mkParticle t l s =
 >     Particle 
 >         t
@@ -160,6 +143,202 @@ Los combustibles se pueden extraer del catálogo por identificador numérico.
 
 > getFuel :: Catalog -> Int -> Fuel
 > getFuel catalog idx = catalog!!idx
+
+
+Definimos un tipo para guardar las humedades de cada clase de partícula,
+un constructor a partir de una lista de reales y una función para extraer
+la humedad asocidad a una partícula
+
+> data Moistures = Moistures {
+>       d1hr    :: Moisture
+>     , d10hr   :: Moisture
+>     , d100hr  :: Moisture
+>     , d1000hr :: Moisture
+>     , herb    :: Moisture
+>     , wood    :: Moisture
+> } deriving (Show)
+
+> mkMoistures l =
+>     case length l of
+>          6  -> Moistures (ts!!0) (ts!!1) (ts!!2) (ts!!3) (ts!!4) (ts!!5)
+>          _  -> error "invalid list length"
+>     where ts = map toMoisture l
+
+> toMoisture :: Double -> Moisture
+> toMoisture v
+>     | v>=0 && v<=1 = (v *~ one)
+>     | otherwise    = error "moisture must be between 0 a 1"
+            
+
+> particleMoisture :: Particle -> Moistures -> Moisture
+> particleMoisture p =
+>    case type_ p of
+>      Herb -> herb
+>      Wood -> wood
+>      Dead -> [d1hr, d1hr, d10hr, d10hr, d100hr, d100hr] !! (sizeClass p)
+
+> sizeClass :: Particle -> Int
+> sizeClass p =
+>     toEnum . fst . head . P.dropWhile gtThanSavr $ zip [0..] size_boundary
+>     where size_boundary    = [1200, 192, 96, 48, 16, 0]
+>           gtThanSavr (_,v) = savr p < v *~ perFoot
+
+
+> data Wind    = Wind    Speed Azimuth 
+> data Terrain = Terrain Slope Azimuth 
+
+Ecuaciones de comportamiento del fuego de superficie
+---------------------------------------------------------------------
+
+Transcritas de "A Mathematical model for predicting fire spread in wildland
+fuels" (Rothermel 1972) con los coeficientes adaptados al sistema internacional
+ "Reformulations of forest fire spread equations in SI units" (Wilson 1980)
+
+Ecuación 52
+
+> rateOfSpread ::
+>   Fraction          ->  -- Wind coefficient
+>   Fraction          ->  -- Slope Coefficient
+>   ReactionIntensity ->  -- Reaction intensity
+>   Fraction          ->  -- propagating flux ratio
+>   Density           ->  -- bulk density
+>   Fraction          ->  -- effective heating number
+>   HeatOfCombustion  ->  -- heat of preignition
+>   RateOfSpread
+> rateOfSpread phiW phiS ir e pb e' qig
+>     = ir * e * (_1 + phiW + phiS)
+>     / (pb * e' * qig)
+
+
+> rateOfSpread0 ::
+>   ReactionIntensity ->  -- Reaction intensity
+>   Fraction          ->  -- propagating flux ratio
+>   Density           ->  -- bulk density
+>   Fraction          ->  -- effective heating number
+>   HeatOfCombustion  ->  -- heat of preignition
+>   RateOfSpread
+> rateOfSpread0 = rateOfSpread _0 _0
+
+Ecuación 27
+
+> reactionIntensity ::
+>   ReactionVelocity ->  -- optimum reaction velocity
+>   FuelLoad         ->  -- net fuel loading
+>   HeatOfCombustion ->  -- fuel particle heat content
+>   Fraction         ->  -- moisture damping coefficient
+>   Fraction         ->  -- mineral damping coefficient
+>   ReactionIntensity
+> reactionIntensity r w h m s = r * w * h * m * s
+
+Ecuaciones 38 y 36
+
+> optimumReactionVelocity :: SaToVolRatio -> Fraction -> ReactionVelocity
+> optimumReactionVelocity s b = orv `asUnits` (minute ^ neg1)
+>  where
+>     orv  = rmax * ((b / bop) ** a) * exp (a * ((_1 - b) / bop))
+>     a    = (((6.7229 *~ centi meter) * s) ** (0.1 *~ one)) - (7.27 *~ one)
+>     bop  = optimumPackingRatio s
+>     rmax = dl 0.0591 + (((2.926 *~ centi meter) * s) ** dl (-1.5))
+
+Ecuación 37
+
+> optimumPackingRatio :: SaToVolRatio -> Fraction
+> optimumPackingRatio s = ((0.20395 *~ centi meter) * s) ** dl (-0.8189)
+
+
+Ecuación 29
+
+> moistureDampingCoefficient ::
+>   Moisture ->  -- Fuel moisture
+>   Moisture ->  -- Extinction moisture
+>   Fraction
+> moistureDampingCoefficient m mext
+>    = _1
+>    - dl 2.59 *  m / mext
+>    + dl 5.11 * (m / mext ** dl 2)
+>    - dl 3.52 * (m / mext ** dl 3)
+
+Ecuación 30
+
+> mineralDampingCoeffient ::
+>   EffectiveMineralContent -> Fraction
+> mineralDampingCoeffient se = dl 0.174 * (se ** dl (-0.19))
+
+Ecuación 42
+
+> propagatingFluxRatio ::
+>   SaToVolRatio ->  -- particle surafce area to volume ratio
+>   Fraction     ->  -- packing ratio
+>   Fraction
+> propagatingFluxRatio s b
+>     = exp ( (dl 0.792 + sqrt((3.7597 *~ centi meter) * s)) * (b + dl 0.1) )
+>     / (dl 192 + ((7.9095 *~ centi meter) * s))
+
+
+Ecuaciones 47, 48, 49 y 50
+
+> windCoefficient = undefined
+
+
+Ecuación 24
+
+> netFuelLoading :: FuelLoad -> Fraction -> FuelLoad
+> netFuelLoading  wo st = wo / (_1 - st)
+
+
+Ecuación 51
+
+> slopeCoefficient = undefined
+
+
+Ecuación 40
+
+> bulkDensity :: FuelLoad -> (Length Double) -> Density
+> bulkDensity load depth = load / depth
+
+
+Ecuación 14
+
+> effectiveHetaingNumber :: SaToVolRatio -> Fraction
+> effectiveHetaingNumber s = exp ( ((-4.528) *~ ((centi meter) ^ neg1)) / s )
+
+Ecuación 12
+
+> heatOfPreignition :: Moisture -> HeatOfCombustion
+> heatOfPreignition m = (dl 581 + (dl 2594 * m)) `asUnits` (joule/gram)
+
+Ecuación 31
+
+> packingRatio :: Density -> Density -> Fraction
+> packingRatio pb pp = pb / pp
+
+
+Utilidades para operar con valores adimensionales
+
+> dl v = v *~ one
+
+> asUnits v u = (v /~ one) *~ u
+
+A continuación se definen tipos para las unidades del sistema imperial en las
+que introduciremos los parámetros del modelo estándar.
+La librería Dimensions se encarga de la conversión desde y hacia el sistema
+métrico internacional.
+
+> lbSqFt :: Unit DFuelLoad Double
+> lbSqFt = poundMass/(foot ^ pos2)
+
+> lbCuFt :: Unit DDensity Double
+> lbCuFt = poundMass/(foot ^ pos3)
+
+> btu:: Unit DEnergy Double
+> btu = prefix 0.293071 (watt * hour)
+
+> btuLb:: Unit DHeatOfCombustion Double
+> btuLb = btu / poundMass
+
+> perFoot :: Unit DSaToVolRatio Double
+> perFoot  = foot ^ neg1
+
 
 
 Definimos el catálogo estándar:
@@ -229,292 +408,3 @@ Definimos el catálogo estándar:
 >         mkPart (_,t,l,s)           = mkParticle t (l*~lbSqFt) (s*~perFoot)
 >         filterByIdx i              = filter (\(i',_,_,_) -> i == i')
 >     in map createFuel $ zip [0..] fuels
-
-A continuación se definen las ecuaciones para calcular los parámetros de las
-partículas y modelos de combustible que se pueden derivar de los intrínsecos.
-
-Comenzamos definiendo un épsilon muy pequeño para ver si los valores de cierta
-unidad son distintos de cero. Ésto es necesario debido a como se representan
-en la máquina los números en coma flotante.
-
-> smidgen u = 1e-6 *~ u
-> nonZero v u = abs v > smidgen u
-
-Los nombres intentan reflejar los originales aunque se puede ver, por el tipo
-de dimensiones que devuelven, que estos no eran muy precisos. Por ejemplo,
-`surfaceArea` es adimensional cuando su nombre sugiere que devuelve un area.
-
-> surfaceArea :: Particle -> Dimensionless Double
-> surfaceArea p = load p * savr p / dens p
-
-> sigmaFactor :: Particle -> Dimensionless Double
-> sigmaFactor p
->     | nonZero (savr p) perFoot = exp ((-138) *~ perFoot / savr p)
->     | otherwise                = _0
-
-> sizeClass :: Particle -> Int
-> sizeClass p =
->     toEnum . fst . head . P.dropWhile gtThanSavr $ zip [0..] size_boundary
->     where size_boundary    = [1200, 192, 96, 48, 16, 0]
->           gtThanSavr (_,v) = savr p < v *~ perFoot
-
-Vamos a necesitar agregar ciertos computos que operan sobre todas las
-partículas de un modelo de combustible por lo que definimos algunas funciones
-que nos ayuden.
-
-`overFilteredParticles` aplica una funcion sobre todas las particulas que pasen
-un filtro y suma los resultados.
-
-> overFilteredParticles
->   :: Num a =>
->      (Particle -> Quantity d a) -> 
->      (Particle -> Bool) ->
->       Fuel ->
->       Quantity d a
-> overFilteredParticles mfunc ffunc = sum . map mfunc . filter ffunc . particles
-
-`overParticles` aplica una funcion sobre todas las particulas y suma los
-resultados, sin filtrar.
-
-> overParticles :: Num a => (Particle -> Quantity d a) -> Fuel -> Quantity d a
-> overParticles f = sum . map f . particles
-
-
-> totalAreaBy :: (Particle -> Bool) -> Fuel -> Dimensionless Double
-> totalAreaBy = overFilteredParticles surfaceArea
-
-> totalArea :: Fuel -> Dimensionless Double
-> totalArea = overParticles surfaceArea
-
-
-> areaWeight :: Fuel -> Particle -> Dimensionless Double
-> areaWeight f p = surfaceArea p / totalAreaOfSameLiveness
->     where totalAreaOfSameLiveness = totalAreaBy (\p'->isAlive p == isAlive p') f
-
-> overParticlesPerDepth f fuel = (overParticles f fuel) / depth fuel
-
-> bulkDensity :: Fuel -> Density
-> bulkDensity = overParticlesPerDepth load
-
-> beta :: Fuel -> Dimensionless Double
-> beta = overParticlesPerDepth (\p -> load p / dens p)
-
-> sigma :: Fuel -> Dimensionless Double
-> sigma fuel = sigma' isAlive + sigma' (not.isAlive)
->     where sigma' f = (totalAreaWtBy f fuel) * (totalSavrBy f fuel) * (1 *~foot)
-
-> totalAreaWtBy :: (Particle -> Bool) -> Fuel -> Dimensionless Double
-> totalAreaWtBy func fuel = (totalAreaBy func fuel) / totalArea fuel
-
-
-> residenceTime :: Fuel -> Time Double
-> residenceTime fuel = (384 *~ minute) / sigma fuel
-
-> sizeAreaWeight :: Fuel -> Particle -> Dimensionless Double
-> sizeAreaWeight f p = overFilteredParticles (areaWeight f) filter' $ f
->     where filter' p' = sizeClass p == sizeClass p' && isAlive p == isAlive p'
-
-> totalLoadBy :: (Particle -> Bool) -> Fuel -> FuelLoad
-> totalLoadBy f fuel =
->     overFilteredParticles
->     (\p -> (sizeAreaWeight fuel p) * load p * (_1 - (stot p)))
->     f fuel
-
-> overFilteredParticlesTimesAw mfunc ffunc fuel =
->     overFilteredParticles (\p -> (areaWeight fuel p) * mfunc p) ffunc fuel
-
-> totalSavrBy :: (Particle -> Bool) -> Fuel -> SurfaceAreaToVolume
-> totalSavrBy = overFilteredParticlesTimesAw savr
-
-> totalHeatBy :: (Particle -> Bool) -> Fuel -> HeatOfCombustion
-> totalHeatBy = overFilteredParticlesTimesAw heat
-
-> totalSeffBy :: (Particle -> Bool) -> Fuel -> Fraction
-> totalSeffBy = overFilteredParticlesTimesAw seff
-
-> totalEtaSBy :: (Particle -> Bool) -> Fuel -> Fraction
-> totalEtaSBy f fuel
->     | eta' <= _1 && (totalSeffBy f fuel) > _0 = eta'
->     | otherwise                               = _1
->     where eta'  = (0.174 *~ one) / ((totalSeffBy f fuel) ** (0.19 *~ one))
-
-> rxFactorBy :: (Particle -> Bool) -> Fuel -> HeatFluxDensity Double
-> rxFactorBy f fuel = totalLoadBy f fuel
->                   * totalHeatBy f fuel
->                   * totalEtaSBy f fuel
->                   * gamma fuel
->                   / (1 *~ second)
- 
-> gamma
->  , slopeK
->  , windB
->  , windK
->  , windE
->  , c
->  , e
->  , liveExtinctionFactor
->     :: Fuel -> Dimensionless Double
-
-> gamma fuel = gammaMax * (ratio fuel ** aa) * exp (aa * (_1 - ratio fuel))
->     where gammaMax = sigma15 / ((495 *~ one) + (0.0594 *~ one) * sigma15)
->           sigma15  = (sigma fuel) ** (1.5 *~ one)
->           aa       = (133 *~ one) / (sigma fuel ** (0.7913 *~ one))
-
-> ratio fuel = beta fuel / betaOpt
->     where betaOpt  = (3.348 *~ one) / (sigma fuel ** (0.8189 *~ one))
-
-> propagatingFluxRatio fuel = toUnits pfr (meter^neg2 * second^pos2)
->     where pfr = exp (s1 * b) / s2
->           s1  = (0.792 *~ one) + (0.681 *~ one) * sqrt (sigma fuel)
->           b   = beta fuel + (0.1*~one)
->           s2  = (192 *~ one) + (0.2595 *~ one) * sigma fuel
-
-> toUnits v u = (v /~ one) *~ u
-
-> slopeK fuel = (5.275 *~ one) * (beta fuel ** ((-0.3)*~one))
-
-> windB fuel = (0.02526 *~ one) * (sigma fuel ** (0.54*~one))
-
-> c fuel = (7.47*~one) * exp (((-0.133)*~one) * (sigma fuel) ** (0.55*~one))
-
-> e fuel = (0.715 *~ one) * exp (((-0.000359) *~ one) * sigma fuel)
-
-> windK fuel = c fuel * (ratio fuel ** ( _0 - (e fuel)))
-
-> windE fuel = (ratio fuel ** e fuel) / c fuel
-
-> liveExtinctionFactor fuel
->     | nonZero (fineLive fuel) lbSqFt = (2.9*~one)
->                                      * fineDead fuel / fineLive fuel
->     | otherwise                      = (0 *~ one)
-
-> hasLiveFuel fuel = nonZero (totalLoadBy isAlive fuel) lbSqFt
-
-> fineLive, fineDead :: Fuel -> FuelLoad
-> fineLive fuel =
->     if hasLiveFuel fuel
->     then overFilteredParticles 
->          (\p -> load p * exp (((-500)*~perFoot)/ savr p))
->          isAlive
->          fuel
->     else (0 *~ lbSqFt)
-
-Nota: el código original no calcula fineDead si no hay partículas vivas en el
-combustible. Lo cual no tiene mucho sentido, ¿no? Intentamos ser fieles a la
-implementación original
-
-> fineDead fuel =
->     if hasLiveFuel fuel
->     then overFilteredParticles 
->          (\p -> load p * sigmaFactor p)
->          (not.isAlive)
->          fuel
->     else (0 *~ lbSqFt)
-
-
-A continuación las ecuaciones de los parámetros que dependen de la humedad del
-combustible
-
-> data TimeLag = TimeLag {
->       d1hr    :: Moisture
->     , d10hr   :: Moisture
->     , d100hr  :: Moisture
->     , d1000hr :: Moisture
->     , herb    :: Moisture
->     , wood    :: Moisture
-> } deriving (Show)
-
-> mkTimeLag l =
->     case length l of
->          6  -> TimeLag (ts!!0) (ts!!1) (ts!!2) (ts!!3) (ts!!4) (ts!!5)
->          _  -> error "invalid list length"
->     where ts = map toMoisture l
-
-> toMoisture :: Double -> Moisture
-> toMoisture v
->     | v>=0 && v<=1 = (v *~ one)
->     | otherwise    = error "moisture must be between 0 a 1"
-            
-
-> particleMoisture :: Particle -> TimeLag -> Moisture
-> particleMoisture p =
->    case type_ p of
->      Herb -> herb
->      Wood -> wood
->      Dead -> [d1hr, d1hr, d10hr, d10hr, d100hr, d100hr] !! (sizeClass p)
-
-
-> totalMoistureBy :: (Particle -> Bool) -> TimeLag -> Fuel -> Moisture
-> totalMoistureBy f tl fuel =
->    overFilteredParticles
->    (\p-> (areaWeight fuel p) * (particleMoisture p tl))
->    f
->    fuel
-
-> type IsFuelAlive = Bool
-
-> moisture, extinctionMoisture, etaM ::
->   IsFuelAlive -> TimeLag -> Fuel -> Moisture
-
-> moisture True = totalMoistureBy isAlive
-> moisture False = totalMoistureBy (not.isAlive)
-
-> extinctionMoisture True tl fuel
->    | hasLiveParticles fuel = liveExtinctionFactor fuel
->                            * (_1 - (fdmois tl fuel)/(mext fuel))
->                            - (0.226 *~ one)
->    | otherwise             = _0
-> extinctionMoisture False tl fuel = mext fuel
-
-> hasLiveParticles :: Fuel -> Bool
-> hasLiveParticles = any isAlive . particles
-
-> etaM alive tl fuel
->     | nonZero mext one &&
->       moist < mext  = etaM'
->     | otherwise     = _0
->   where mext  = extinctionMoisture alive tl fuel
->         moist = moisture alive tl fuel 
->         ratio = moist / mext
->         etaM' = _1
->               - (2.59 *~ one) * ratio
->               + (5.11 *~ one) * (ratio ** _2)
->               - (3.52 *~ one) * (ratio ** _3)
->      
-
-> fdmois :: TimeLag -> Fuel -> Moisture
-> fdmois tl fuel
->    | hasLiveParticles fuel &&
->      nonZero (fineDead fuel) lbSqFt = (wfmd tl fuel) / fineDead fuel
->    | otherwise                      = _0
-
-> wfmd :: TimeLag -> Fuel -> FuelLoad
-> wfmd tl fuel =
->   overFilteredParticles
->   (\p -> (particleMoisture p tl) * sigmaFactor p * load p)
->   (not.isAlive)
->   fuel
-
-> rbQig :: TimeLag -> Fuel -> Density
-> rbQig tl fuel = (bulkDensity fuel) * (overParticles qig fuel)
->     where qig p = ((250 *~ one) + (1116 *~ one) * (particleMoisture  p tl))
->                 * (areaWeight fuel p)
->                 * (totalAreaWtBy (\p' -> isAlive p == isAlive p') fuel)
->                 * sigmaFactor p
-
-> reactionIntensity :: TimeLag -> Fuel -> HeatFluxDensity Double
-> reactionIntensity tl fuel
->     = (rxFactorBy isAlive fuel)       * (etaM True tl fuel)
->     + (rxFactorBy (not.isAlive) fuel) * (etaM False tl fuel)
->
-
-> heatPerUnitArea :: TimeLag -> Fuel -> HeatPerUnitArea
-> heatPerUnitArea tl fuel = (reactionIntensity tl fuel) * residenceTime fuel
-
-> spread0 :: TimeLag -> Fuel -> Velocity Double
-
-> spread0 tl fuel
->    | nonZero (rbQig tl fuel) (gram/meter^pos3) = reactionIntensity tl fuel
->                                                * propagatingFluxRatio fuel
->                                                / rbQig tl fuel
->    | otherwise                                 = 0 *~ (meter/second)
