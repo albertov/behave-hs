@@ -157,25 +157,25 @@ la humedad asocidad a una partícula
 >     , herb    :: Moisture
 >     , wood    :: Moisture
 > } deriving (Show)
->
+
 > mkMoistures l =
 >     case length l of
 >          6  -> Moistures (ts!!0) (ts!!1) (ts!!2) (ts!!3) (ts!!4) (ts!!5)
 >          _  -> error "invalid list length"
 >     where ts = map toFraction l
->            
+             
 > particleMoisture :: Particle -> Moistures -> Moisture
 > particleMoisture p =
 >    case type_ p of
 >      Herb -> herb
 >      Wood -> wood
 >      Dead -> [d1hr, d1hr, d10hr, d10hr, d100hr, d100hr] !! (sizeClass p)
->
+
 > sizeClass :: Particle -> Int
 > sizeClass p = fst . head . P.dropWhile gtThanSavr $ class_sizes
 >     where class_sizes      = zip [0..] [1200, 192, 96, 48, 16, 0]
 >           gtThanSavr (_,v) = savr p < v *~ perFoot
->
+
 
 Una función para crear fracciones asegurando que su valor está entre 0 y 1
 
@@ -183,7 +183,7 @@ Una función para crear fracciones asegurando que su valor está entre 0 y 1
 > toFraction v
 >     | v>=0 && v<=1 = (v *~ one)
 >     | otherwise    = error "moisture must be between 0 a 1"
->
+
 > data Wind    = Wind    Speed Azimuth 
 > data Terrain = Terrain Slope Azimuth 
 
@@ -208,7 +208,7 @@ Ecuación 52
 > rateOfSpread phiW phiS ir e pb e' qig
 >     = ir * e * (_1 + phiW + phiS)
 >     / (pb * e' * qig)
->
+
 > rateOfSpread0 ::
 >   ReactionIntensity ->  -- Reaction intensity
 >   Ratio             ->  -- propagating flux ratio
@@ -314,7 +314,7 @@ Utilidades para operar con valores adimensionales
 
 > dl :: Num a => a -> Dimensionless a
 > dl v = v *~ one
->
+
 > asUnits :: Fractional a => Dimensionless a -> Unit d a -> Quantity d a
 > asUnits v u = (v /~ one) *~ u
 
@@ -325,16 +325,16 @@ métrico internacional.
 
 > lbSqFt :: Unit DFuelLoad Double
 > lbSqFt = poundMass/(foot ^ pos2)
->
+
 > lbCuFt :: Unit DDensity Double
 > lbCuFt = poundMass/(foot ^ pos3)
->
+
 > btu:: Unit DEnergy Double
 > btu = prefix 0.293071 (watt * hour)
->
+
 > btuLb:: Unit DHeatOfCombustion Double
 > btuLb = btu / poundMass
->
+
 > perFoot :: Unit DSaToVolRatio Double
 > perFoot  = foot ^ neg1
 
