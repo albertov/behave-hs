@@ -22,7 +22,7 @@ con dimensiones físicas asociadas. Éstos son comprobados por el sistema de tip
 de Haskell cuando el programa es compilado ayudando documentar y a prevenir
 errores.
 
-> import           Numeric.Units.Dimensional (Dimensional)
+> import           Numeric.Units.Dimensional
 > import           Numeric.Units.Dimensional.Prelude hiding (Density)
 > import           Numeric.Units.Dimensional.NonSI (poundMass, foot)         
 > import           Numeric.NumType (Neg1, Neg2, Neg3, Pos1, Pos2, Zero)
@@ -73,6 +73,7 @@ Y ahora los tipos para las cantidades (dimensión asociada a un valor)
 > type HeatOfCombustion        = Quantity DHeatOfCombustion Double
 > type HeatPerUnitArea         = Quantity DHeatPerUnitArea Double
 > type ReactionVelocity        = Quantity DReactionVelocity Double
+> type Ratio                   = Dimensionless Double
 > type Fraction                = Dimensionless Double
 > type Moisture                = Fraction
 > type TotalMineralContent     = Fraction
@@ -118,8 +119,8 @@ algunos parámetros por defecto.
 >         s
 >         (32.0   *~ lbCuFt)
 >         (8000   *~ btuLb)
->         (0.0555 *~ one)
->         (0.0100 *~ one)
+>         (toFraction 0.0555)
+>         (toFraction 0.0100)
 
 El combustible tiene asociado un nombre, descripción, profundidad, humedad de
 exitinción, factor de ajuste y una lista de particulas.
@@ -144,8 +145,7 @@ Los combustibles se pueden extraer del catálogo por identificador numérico.
 > getFuel :: Catalog -> Int -> Fuel
 > getFuel catalog idx = catalog!!idx
 
-
-Definimos un tipo para guardar las humedades de cada clase de partícula,
+Definimos un tipo para guardar las humedades de cada clase de partícula.
 un constructor a partir de una lista de reales y una función para extraer
 la humedad asocidad a una partícula
 
@@ -157,64 +157,63 @@ la humedad asocidad a una partícula
 >     , herb    :: Moisture
 >     , wood    :: Moisture
 > } deriving (Show)
-
+>
 > mkMoistures l =
 >     case length l of
 >          6  -> Moistures (ts!!0) (ts!!1) (ts!!2) (ts!!3) (ts!!4) (ts!!5)
 >          _  -> error "invalid list length"
->     where ts = map toMoisture l
-
-> toMoisture :: Double -> Moisture
-> toMoisture v
->     | v>=0 && v<=1 = (v *~ one)
->     | otherwise    = error "moisture must be between 0 a 1"
-            
-
+>     where ts = map toFraction l
+>            
 > particleMoisture :: Particle -> Moistures -> Moisture
 > particleMoisture p =
 >    case type_ p of
 >      Herb -> herb
 >      Wood -> wood
 >      Dead -> [d1hr, d1hr, d10hr, d10hr, d100hr, d100hr] !! (sizeClass p)
-
+>
 > sizeClass :: Particle -> Int
-> sizeClass p =
->     toEnum . fst . head . P.dropWhile gtThanSavr $ zip [0..] size_boundary
->     where size_boundary    = [1200, 192, 96, 48, 16, 0]
+> sizeClass p = fst . head . P.dropWhile gtThanSavr $ class_sizes
+>     where class_sizes      = zip [0..] [1200, 192, 96, 48, 16, 0]
 >           gtThanSavr (_,v) = savr p < v *~ perFoot
+>
 
+Una función para crear fracciones asegurando que su valor está entre 0 y 1
 
+> toFraction :: (Num a, Ord a) => a -> Quantity DOne a
+> toFraction v
+>     | v>=0 && v<=1 = (v *~ one)
+>     | otherwise    = error "moisture must be between 0 a 1"
+>
 > data Wind    = Wind    Speed Azimuth 
 > data Terrain = Terrain Slope Azimuth 
 
 Ecuaciones de comportamiento del fuego de superficie
----------------------------------------------------------------------
+-----------------------------------------------------
 
 Transcritas de "A Mathematical model for predicting fire spread in wildland
 fuels" (Rothermel 1972) con los coeficientes adaptados al sistema internacional
- "Reformulations of forest fire spread equations in SI units" (Wilson 1980)
+"Reformulations of forest fire spread equations in SI units" (Wilson 1980)
 
 Ecuación 52
 
 > rateOfSpread ::
->   Fraction          ->  -- Wind coefficient
->   Fraction          ->  -- Slope Coefficient
+>   Ratio             ->  -- Wind coefficient
+>   Ratio             ->  -- Slope Coefficient
 >   ReactionIntensity ->  -- Reaction intensity
->   Fraction          ->  -- propagating flux ratio
+>   Ratio             ->  -- propagating flux ratio
 >   Density           ->  -- bulk density
->   Fraction          ->  -- effective heating number
+>   Ratio             ->  -- effective heating number
 >   HeatOfCombustion  ->  -- heat of preignition
 >   RateOfSpread
 > rateOfSpread phiW phiS ir e pb e' qig
 >     = ir * e * (_1 + phiW + phiS)
 >     / (pb * e' * qig)
-
-
+>
 > rateOfSpread0 ::
 >   ReactionIntensity ->  -- Reaction intensity
->   Fraction          ->  -- propagating flux ratio
+>   Ratio             ->  -- propagating flux ratio
 >   Density           ->  -- bulk density
->   Fraction          ->  -- effective heating number
+>   Ratio             ->  -- effective heating number
 >   HeatOfCombustion  ->  -- heat of preignition
 >   RateOfSpread
 > rateOfSpread0 = rateOfSpread _0 _0
@@ -225,8 +224,8 @@ Ecuación 27
 >   ReactionVelocity ->  -- optimum reaction velocity
 >   FuelLoad         ->  -- net fuel loading
 >   HeatOfCombustion ->  -- fuel particle heat content
->   Fraction         ->  -- moisture damping coefficient
->   Fraction         ->  -- mineral damping coefficient
+>   Ratio            ->  -- moisture damping coefficient
+>   Ratio            ->  -- mineral damping coefficient
 >   ReactionIntensity
 > reactionIntensity r w h m s = r * w * h * m * s
 
@@ -251,7 +250,7 @@ Ecuación 29
 > moistureDampingCoefficient ::
 >   Moisture ->  -- Fuel moisture
 >   Moisture ->  -- Extinction moisture
->   Fraction
+>   Ratio      
 > moistureDampingCoefficient m mext
 >    = _1
 >    - dl 2.59 *  m / mext
@@ -268,17 +267,15 @@ Ecuación 42
 
 > propagatingFluxRatio ::
 >   SaToVolRatio ->  -- particle surafce area to volume ratio
->   Fraction     ->  -- packing ratio
->   Fraction
+>   Ratio        ->  -- packing ratio
+>   Ratio      
 > propagatingFluxRatio s b
 >     = exp ( (dl 0.792 + sqrt((3.7597 *~ centi meter) * s)) * (b + dl 0.1) )
 >     / (dl 192 + ((7.9095 *~ centi meter) * s))
 
-
 Ecuaciones 47, 48, 49 y 50
 
 > windCoefficient = undefined
-
 
 Ecuación 24
 
@@ -299,7 +296,7 @@ Ecuación 40
 
 Ecuación 14
 
-> effectiveHetaingNumber :: SaToVolRatio -> Fraction
+> effectiveHetaingNumber :: SaToVolRatio -> Ratio
 > effectiveHetaingNumber s = exp ( ((-4.528) *~ ((centi meter) ^ neg1)) / s )
 
 Ecuación 12
@@ -309,14 +306,16 @@ Ecuación 12
 
 Ecuación 31
 
-> packingRatio :: Density -> Density -> Fraction
+> packingRatio :: Density -> Density -> Ratio
 > packingRatio pb pp = pb / pp
 
 
 Utilidades para operar con valores adimensionales
 
+> dl :: Num a => a -> Dimensionless a
 > dl v = v *~ one
-
+>
+> asUnits :: Fractional a => Dimensionless a -> Unit d a -> Quantity d a
 > asUnits v u = (v /~ one) *~ u
 
 A continuación se definen tipos para las unidades del sistema imperial en las
@@ -326,23 +325,20 @@ métrico internacional.
 
 > lbSqFt :: Unit DFuelLoad Double
 > lbSqFt = poundMass/(foot ^ pos2)
-
+>
 > lbCuFt :: Unit DDensity Double
 > lbCuFt = poundMass/(foot ^ pos3)
-
+>
 > btu:: Unit DEnergy Double
 > btu = prefix 0.293071 (watt * hour)
-
+>
 > btuLb:: Unit DHeatOfCombustion Double
 > btuLb = btu / poundMass
-
+>
 > perFoot :: Unit DSaToVolRatio Double
 > perFoot  = foot ^ neg1
 
-
-
-Definimos el catálogo estándar:
-
+El catálogo estándar:
 
 > standardCatalog :: Catalog
 > standardCatalog =
