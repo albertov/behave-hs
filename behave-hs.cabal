@@ -1,0 +1,21 @@
+Name:                behave-hs
+Version:             0.1
+Synopsis:            Haskell implementation of the BEHAVE algorithms
+Description:         Project Description Here
+License:             BSD3
+Author:              Alberto Valverde González
+Maintainer:          alberto@meteogrid.com
+Stability:           Experimental
+Category:            Scientific
+Build-type:          Simple
+Cabal-version:       >=1.2
+hs-source-dirs:      src
+Exposed-Modules:     Behave
+
+Build-depends:
+    base                      >= 4     && < 5,
+    dimensional               >= 0.10.2,
+    vector,
+    numtype
+
+ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
