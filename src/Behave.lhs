@@ -5,6 +5,8 @@ El módulo BEHAVE comienza definiendo su nombre y los símbolos que exporta.
 Cualquier símbolo no declarado aquí no se podrá utilizar fuera del módulo
 permitiendo la encapsulación de detalles de la implementación.
 
+> {-# LANGUAGE DataKinds #-}
+> {-# OPTIONS_GHC -funbox-strict-fields #-}
 > module Behave (
 >     Particle (Particle)
 >   , ParticleType (Dead, Herb, Wood)
@@ -20,17 +22,17 @@ con dimensiones físicas asociadas. Éstos son comprobados por el sistema de tip
 de Haskell cuando el programa es compilado ayudando documentar y a prevenir
 errores.
 
-> import           Numeric.Units.Dimensional
-> import           Numeric.Units.Dimensional.Prelude hiding (Density)
-> import           Numeric.Units.Dimensional.NonSI (poundMass, foot)         
-> import           Numeric.NumType (Neg1, Neg2, Neg3, Pos1, Pos2, Zero)
+> import           Data.List (foldl')
+> import           Numeric.Units.Dimensional.DK
+> import           Numeric.Units.Dimensional.DK.Prelude hiding (Density)
+> import           Numeric.Units.Dimensional.DK.NonSI (poundMass, foot)         
+> import           Numeric.NumType.DK.Integers (TypeInt(..))
 
 La librería `Prelude` se importa con nombre calíficado para evitar ambigüedad
 con los operadores del mismo nombre y semántica que se importan de Dimensional
 para operar con magnitudes físicas.
 
 > import qualified Prelude as P
-> import           Data.List (foldl')
 
 Definimos los tipos para las dimensiones físicas con las que trabajaremos.
 La sintaxis para definirla especifica el exponente de cada dimensión del
@@ -46,7 +48,7 @@ Sistema internacional en un vector. Las dimensiones ordenadas son:
 
 Se ve mejor con un ejemplo:
 
-> type DFuelLoad              = Dim Neg2 Pos1 Zero Zero Zero Zero Zero
+> type DFuelLoad              = 'Dim 'Neg2 'Pos1 'Zero 'Zero 'Zero 'Zero 'Zero
 
 Que se lee como:
 
@@ -58,11 +60,10 @@ O lo que es lo mismo: la carga de combustible es una masa dividida entre un area
 
 De la misma manera se definen tipos para dimensiones
 
-> type DSaToVolRatio          = Dim Neg1 Zero Zero Zero Zero Zero Zero
-> type DDensity               = Dim Neg3 Pos1 Zero Zero Zero Zero Zero
-> type DHeatOfCombustion      = Dim Pos2 Zero Neg2 Zero Zero Zero Zero
-> type DHeatPerUnitArea       = Dim Zero Pos1 Neg2 Zero Zero Zero Zero
-> type DReactionVelocity      = Dim Zero Zero Neg1 Zero Zero Zero Zero
+> type DSaToVolRatio          = 'Dim 'Neg1 'Zero 'Zero 'Zero 'Zero 'Zero 'Zero
+> type DHeatOfCombustion      = 'Dim 'Pos2 'Zero 'Neg2 'Zero 'Zero 'Zero 'Zero
+> type DHeatPerUnitArea       = 'Dim 'Zero 'Pos1 'Neg2 'Zero 'Zero 'Zero 'Zero
+> type DReactionVelocity      = 'Dim 'Zero 'Zero 'Neg1 'Zero 'Zero 'Zero 'Zero
 
 Y ahora los tipos para las cantidades (dimensión asociada a un valor)
 
@@ -151,11 +152,11 @@ Ecuación 29
 >   Moisture ->  -- Fuel moisture
 >   Moisture ->  -- Extinction moisture
 >   Ratio      
-> moistureDampingRatio' m mext
+> moistureDampingRatio' m mx
 >    = _1
->    - dl 2.59 *  m / mext
->    + dl 5.11 * ((m / mext) ** dl 2)
->    - dl 3.52 * ((m / mext) ** dl 3)
+>    - dl 2.59 *  m / mx
+>    + dl 5.11 * ((m / mx) ** dl 2)
+>    - dl 3.52 * ((m / mx) ** dl 3)
 
 Ecuación 30
 
@@ -216,14 +217,15 @@ Formulación del modelo de combustible
 El combustible tiene asociado un nombre, descripción, profundidad, humedad de
 exitinción, factor de ajuste y un conjunto de particulas.
 
-> data Fuel = Fuel {
->     name      :: String,               -- Fuel model name
->     desc      :: String,               -- Fuel model description
->     depth     :: Length Double,        -- Fuel model total depth
->     mext      :: Moisture,             -- Fuel model moisture of extinction
->     adjust    :: Ratio,          -- Fuel model adjustment factor
->     particles :: [Particle]            -- Fuel model particle array
-> } deriving (Eq, Show)
+> data Fuel
+>   = Fuel {
+>       name      :: !String             -- Fuel model name
+>     , desc      :: !String             -- Fuel model description
+>     , depth     :: !(Length Double)    -- Fuel model total depth
+>     , mext      :: !Moisture           -- Fuel model moisture of extinction
+>     , adjust    :: !Ratio              -- Fuel model adjustment factor
+>     , particles :: [Particle]          -- Fuel model particle array
+>   } deriving (Eq, Show)
 
 
 Necesitaremos un catalogo para buscar los combustibles por identificador
@@ -242,15 +244,16 @@ poder cambiar la implementación sin modificar los clientes.
 Las partículas del combustible tienen un tipo de partícula asociado y parámetros
 intrínsecos.
 
-> data Particle = Particle {
->     type_:: ParticleType,
->     load :: FuelLoad,
->     savr :: SaToVolRatio,
->     dens :: Density,
->     heat :: HeatOfCombustion,
->     mtot :: TotalMineralContent,
->     meff :: EffectiveMineralContent
-> } deriving (Eq, Show)
+> data Particle
+>   = Particle {
+>       type_:: !ParticleType
+>     , load :: !FuelLoad
+>     , savr :: !SaToVolRatio
+>     , dens :: !Density
+>     , heat :: !HeatOfCombustion
+>     , mtot :: !TotalMineralContent
+>     , meff :: !EffectiveMineralContent
+>   } deriving (Eq, Show)
 
 El tipo de partícula. Puede ser "muerto", "herbaceo" o "leñoso".
 
@@ -305,7 +308,7 @@ célula de combustible, se usará para abstraer el computo de dicha media en
 las sucesivas definiciones
 
 > meanCellBy fn fuel cell = sum' / ((fromIntegral len') *~ one)
->   where (sum',len') = foldl' fl (Dimensional 0, 0) particles'
+>   where (sum',len') = foldl' fl (_0, 0) particles'
 >         fl (s,l) p  = (s + fn p, l P.+ 1)
 >         particles'  = filter filterFn $ particles fuel
 >         filterFn p  = lifeClass p == i && sizeClass p == j
@@ -352,19 +355,24 @@ un constructor a partir de una lista de reales y una función para extraer
 la humedad asocidad a una partícula.
 
 > data Moistures = Moistures {
->       d1hr    :: Moisture
->     , d10hr   :: Moisture
->     , d100hr  :: Moisture
->     , d1000hr :: Moisture
->     , herb    :: Moisture
->     , wood    :: Moisture
+>       d1hr    :: !Moisture
+>     , d10hr   :: !Moisture
+>     , d100hr  :: !Moisture
+>     , d1000hr :: !Moisture
+>     , herb    :: !Moisture
+>     , wood    :: !Moisture
 > } deriving (Show)
 
-> mkMoistures l =
->     case length l of
->          6  -> Moistures (ts!!0) (ts!!1) (ts!!2) (ts!!3) (ts!!4) (ts!!5)
->          _  -> error "invalid list length"
->     where ts = map toFraction l
+> mkMoistures
+>   :: Double -> Double -> Double -> Double -> Double -> Double
+>   -> Maybe Moistures
+> mkMoistures a b c d e f
+>   = Moistures <$> toFraction a
+>               <*> toFraction b
+>               <*> toFraction c
+>               <*> toFraction d
+>               <*> toFraction e
+>               <*> toFraction f
 
 > particleMoisture :: Particle -> Moistures -> Moisture
 > particleMoisture p = let ix = fromEnum . sizeClass $ p in
@@ -377,13 +385,13 @@ la humedad asocidad a una partícula.
 
 Una función para crear fracciones asegurando que su valor está entre 0 y 1
 
-> toFraction :: (Num a, Ord a) => a -> Quantity DOne a
+> toFraction :: (Num a, Ord a) => a -> Maybe (Quantity DOne a)
 > toFraction v
->     | v>=0 && v<=1 = (v *~ one)
->     | otherwise    = error "fraction must be between 0 a 1"
+>     | v>=0 && v<=1 = Just (v *~ one)
+>     | otherwise    = Nothing
 
-> data Wind    = Wind    Speed Azimuth 
-> data Terrain = Terrain Slope Azimuth 
+> data Wind    = Wind    !Speed !Azimuth 
+> data Terrain = Terrain !Slope !Azimuth 
 
 
 Utilidades para operar con valores adimensionales
@@ -479,11 +487,11 @@ El catálogo estándar:
 >         mkParts i                  = map mkPart . filterByIdx i $ particles
 >         mkPart (_,t,l,s)           = Particle
 >                                            t
->                                            (l    *~ lbSqFt)
->                                            (s    *~ perFoot)
->                                            (32.0 *~ lbCuFt)
->                                            (8000 *~ btuLb)
->                                            (toFraction 0.0555)
->                                            (toFraction 0.0100)
+>                                            (l      *~ lbSqFt)
+>                                            (s      *~ perFoot)
+>                                            (32.0   *~ lbCuFt)
+>                                            (8000   *~ btuLb)
+>                                            (0.0555 *~ one)
+>                                            (0.0100 *~ one)
 >         filterByIdx i              = filter (\(i',_,_,_) -> i == i')
 >     in map createFuel $ zip [0..] fuels
