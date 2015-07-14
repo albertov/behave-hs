@@ -96,14 +96,14 @@ accumByLife ps f life = accum f (fuelLifeParticles life ps)
 -- Fuel_AreaWtg
 partAreaWtgFactor :: Fuel -> Particle -> Double
 partAreaWtgFactor fuel part
-  = partSurfaceArea part
-    `safeDiv` accum partSurfaceArea (fuelLifeParticles (partLife part) (fuelParticles fuel))
+  = partSurfaceArea part `safeDiv` accum partSurfaceArea sameLifeParticles
+  where
+    sameLifeParticles = fuelLifeParticles (partLife part) (fuelParticles fuel)
 
 -- Fuel_SizeAreaWtg
 partSizeClassWtgFactor :: Fuel -> Particle -> Double
 partSizeClassWtgFactor fuel part
- = U.sum
- . U.map (partAreaWtgFactor fuel)
+ = accum (partAreaWtgFactor fuel)
  . U.filter ((== partSizeClass part) . partSizeClass)
  $ fuelLifeParticles (partLife part) (fuelParticles fuel)
 
