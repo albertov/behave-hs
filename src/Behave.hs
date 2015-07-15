@@ -5,7 +5,16 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Behave where
+module Behave (
+    Catalog(..)
+  , Particle(..)
+  , Fuel(..)
+  , SpreadEnv (..)
+  , Spread (..)
+  , spread
+  , standardCatalog
+  , catalogIndex
+) where
 
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
@@ -150,7 +159,6 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     lifeSeff        = accumByLife' (\p -> partAreaWtg fuel p
                                         * partSiEffective p)
     fuelBulkDensity = accumBy' partLoad `safeDiv` fuelDepth fuel
-                    `safeDiv` fuelDepth fuel
     beta            = accumBy' (\p -> partLoad p `safeDiv` partDensity p)
                     `safeDiv` fuelDepth fuel
     sigma           = lifeAreaWtg Alive * lifeSavr Alive
@@ -266,7 +274,7 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
     rxInt           = combLifeRxFactor Alive * lifeEtaM Alive
                     + combLifeRxFactor Dead  * lifeEtaM Dead
     hpua            = rxInt * combResidenceTime
-    speed0          = (rxInt * combFluxRatio) `safeDiv` rbQig
+    speed0          = rxInt * combFluxRatio `safeDiv` rbQig
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
 
@@ -282,9 +290,6 @@ newtype Catalog a = Catalog {unCatalog :: V.Vector a}
 
 catalogIndex :: Catalog a -> Int -> Maybe a
 catalogIndex (Catalog v) = (V.!?) v
-
-catalogMap :: (a -> b) -> Catalog a -> Catalog b
-catalogMap f = Catalog . V.map f . unCatalog
 
 standardCatalog :: Catalog Fuel
 standardCatalog = Catalog (V.fromList (map createFuel $ zip [0..] fuels))
