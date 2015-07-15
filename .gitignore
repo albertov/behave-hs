@@ -2,3 +2,4 @@
 cabal.sandbox.config
 *.sw?
 dist
+test/HsFirelib.c

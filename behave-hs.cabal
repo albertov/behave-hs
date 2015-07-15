@@ -21,6 +21,7 @@ library
                      , vector
                      , vector-th-unbox
   hs-source-dirs:      src
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 test-suite behave-spec
@@ -29,7 +30,12 @@ test-suite behave-spec
                        base
                      , behave-hs
                      , hspec
+                     , QuickCheck
+                     , inline-c
+  other-modules:       HsFirelib
   ghc-options:         -Wall -rtsopts
   hs-source-dirs:      test
+  c-sources:           test/HsFirelib.c test/fireLib.c
+  cc-options:          -Wall
   main-is:             Spec.hs
   default-language:    Haskell2010
