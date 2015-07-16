@@ -1,6 +1,0 @@
-[submodule "submodules/numtype-dk"]
-	path = submodules/numtype-dk
-	url = https://github.com/bjornbm/numtype-dk.git
-[submodule "submodules/dimensional-dk"]
-	path = submodules/dimensional-dk
-	url = https://github.com/bjornbm/dimensional-dk.git
