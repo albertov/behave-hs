@@ -196,15 +196,19 @@ data Spread
       spreadRxInt         :: Double -- ^ Reaction intensity (BTU/sqft/min)
     , spreadSpeed0        :: Double -- ^ no-wind, no-slope spread rate (ft/min)
     , spreadHpua          :: Double -- ^ heat per unit area (BTU/sqft)
+    , spreadPhiEffWind    :: Double -- ^ combined wind-slope factor
+    , spreadSpeedMax      :: Double -- ^ spread in direction of max spread
+    , spreadAzimuthMax    :: Double -- ^ direction of max spread
+    , spreadEccentricity  :: Double -- ^ eccentricity of the ellipse
   } deriving (Eq, Show)
 
 noSpread :: Spread
-noSpread = Spread 0 0 0
+noSpread = Spread 0 0 0 0 0 0 0
 
 derivingUnbox "Spread"
-    [t| Spread -> (Double,Double,Double) |]
-    [| \(Spread a b c) -> (a,b,c) |]
-    [| \(a,b,c) -> Spread a b c|]
+    [t| Spread -> ((Double,Double,Double,Double), (Double,Double,Double)) |]
+    [| \(Spread a b c d e f g) -> ((a,b,c,d),(e,f,g)) |]
+    [| \((a,b,c,d),(e,f,g)) -> Spread a b c d e f g|]
 
 data SpreadEnv
   = SpreadEnv {
@@ -215,7 +219,7 @@ data SpreadEnv
     , envHerb        :: !Double
     , envWood        :: !Double
     , envWindSpeed   :: !Double
-    , envWindBearing :: !Double
+    , envWindAzimuth :: !Double
     , envSlope       :: !Double
     , envAspect      :: !Double
   } deriving (Eq, Show)
@@ -242,9 +246,13 @@ spread :: Fuel -> SpreadEnv -> Spread
 spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
   | U.null particles = noSpread
   | otherwise        = Spread {
-      spreadRxInt  = rxInt
-    , spreadSpeed0 = speed0
-    , spreadHpua   = hpua
+      spreadRxInt        = rxInt
+    , spreadSpeed0       = speed0
+    , spreadHpua         = hpua
+    , spreadPhiEffWind   = phiEffWind
+    , spreadSpeedMax     = speedMax
+    , spreadAzimuthMax   = azimuthMax
+    , spreadEccentricity = 0
     }
   where
     Combustion{..}  = fuelCombustion fuel
@@ -267,16 +275,145 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
                 * partSigmaFactor p
     lifeEtaM lf
       | lifeMoisture lf >= lifeMext lf = 0
-      | lifeMext lf > smidgen          = 1 - 2.59*rt 1 + 5.11*rt 2 - 3.52*rt 3
+      | lifeMext lf > smidgen          = 1
+                                       - 2.59 * rt^!1
+                                       + 5.11 * rt^!2
+                                       - 3.52 * rt^!3
       | otherwise                      = 0
-      where rt :: Int -> Double
-            rt n = (lifeMoisture lf / lifeMext lf) ^ n
+      where rt = (lifeMoisture lf / lifeMext lf)
     rxInt           = combLifeRxFactor Alive * lifeEtaM Alive
                     + combLifeRxFactor Dead  * lifeEtaM Dead
     hpua            = rxInt * combResidenceTime
     speed0          = rxInt * combFluxRatio `safeDiv` rbQig
+
+    phiSlope        = combSlopeK * (envSlope ^! 2)
+    phiWind
+      | envWindSpeed < smidgen = 0
+      | otherwise              = combWindK * (envWindSpeed ** combWindB)
+    phiEw = phiWind + phiSlope
+
+    (phiEffWind,effWind,speedMax,azimuthMax)
+      = case situation of
+          NoSpread ->
+            (phiEw, 0, 0, 0)
+          NoSlopeNoWind ->
+            (phiEw, 0, speed0, 0)
+          WindNoSlope ->
+            if envWindSpeed > maxWind
+              then maxWindResult envWindAzimuth
+              else (phiEw, envWindSpeed, speed0 * (1 + phiEw), envWindAzimuth)
+          SlopeNoWind -> 
+            if ewFromPhiEw phiEw > maxWind
+              then maxWindResult upslope
+              else (phiEw, ewFromPhiEw phiEw, speed0 * (1 + phiEw), upslope)
+          UpSlope -> 
+            if ewFromPhiEw phiEw > maxWind
+              then maxWindResult upslope
+              else (phiEw, ewFromPhiEw phiEw, speed0 * (1 + phiEw), upslope)
+          CrossSlope ->
+            let rv      = sqrt (x*x + y*y)
+                x       = slpRate + wndRate * cos (degToRad split)
+                y       = wndRate * sin (degToRad split)
+                wndRate = speed0 * phiWind
+                slpRate = speed0 * phiSlope
+                split
+                  | upslope <= envWindAzimuth = envWindAzimuth - upslope
+                  | otherwise                 = 360 - upslope + envWindAzimuth
+                speedMax' = speed0 + rv
+                phiEw'' = speedMax' / speed0 - 1
+                effWind'
+                  | phiEw'' > smidgen = ewFromPhiEw phiEw''
+                  | otherwise         = 0
+                azimuthMax' = 0
+            in if effWind' > maxWind
+              then maxWindResult azimuthMax'
+              else (phiEw'', effWind', speedMax', azimuthMax')
+        where
+          maxWind = 0.9 * rxInt
+          maxWindResult az = (phiEwMaxWind, maxWind, speedMaxWind, az)
+          ewFromPhiEw p  = (p * combWindE) ** (1 / combWindB)
+          speedMaxWind = speed0 * (1 + phiEwMaxWind)
+          phiEwMaxWind
+            | maxWind < smidgen = 0
+            | otherwise         = combWindK * (maxWind ** combWindB)
+
+    {-
+
+    phiEw           = phiWind + phiSlope
+    phiEwOptimal    = speedMax / speed0 - 1
+    phiEw'          = case situation of
+      CrossSlope -> phiEwOptimal
+      _          -> phiEw
+    phiEffWind
+      | checkWindLimit
+      , effectiveWind > maxWind = if maxWind < smidgen
+                                   then 0
+                                   else combWindK * (maxWind ** combWindB)
+      | otherwise               = phiEw'
+    effectiveWind
+      | checkWindLimit = min maxWind ret
+      | otherwise      = ret
+      where
+        ret = case situation of
+          NoSpread      -> 0
+          NoSlopeNoWind -> 0
+          WindNoSlope   -> envWindSpeed
+          SlopeNoWind   -> effWindFromPhiEw
+          UpSlope       -> effWindFromPhiEw
+          CrossSlope    -> if phiEwOptimal > smidgen
+                             then effWindFromPhiEw else 0
+    checkWindLimit = case situation of
+      NoSpread      -> False
+      NoSlopeNoWind -> False
+      WindNoSlope   -> True
+      SlopeNoWind   -> True
+      UpSlope       -> True
+      CrossSlope    -> True
+    speedMax = case situation of
+      NoSpread      -> 0
+      NoSlopeNoWind -> speed0
+      WindNoSlope   -> speed0 * (1+phiEw)
+      SlopeNoWind   -> speed0 * (1+phiEw)
+      UpSlope       -> speed0 * (1+phiEw)
+      CrossSlope    ->
+        let rv      = sqrt (x^!2 + y^!2)
+            x       = slpRate + wndRate + cos (degToRad split)
+            y       = wndRate * sin (degToRad split)
+            wndRate = speed0 * phiWind
+            slpRate = speed0 * phiSlope
+            split
+              | upslope <= envWindAzimuth = envWindAzimuth - upslope
+              | otherwise                 = 3690 - upslope + envWindAzimuth
+        in speed0 + rv
+
+    -}
+    situation
+      | speed0                      < smidgen = NoSpread
+      | phiEw                       < smidgen = NoSlopeNoWind
+      | envSlope                    < smidgen = WindNoSlope
+      | envWindSpeed                < smidgen = SlopeNoWind
+      | abs(upslope-envWindAzimuth) < smidgen = UpSlope
+      | otherwise                             = CrossSlope
+    upslope
+      | envAspect >= 180 = envAspect - 180
+      | otherwise        = envAspect + 180
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
+
+data WindSlopeSituation
+  = NoSpread
+  | NoSlopeNoWind
+  | WindNoSlope
+  | SlopeNoWind
+  | UpSlope
+  | CrossSlope
+
+degToRad :: Double -> Double
+degToRad = (*) 0.017453293
+
+infixr 8 ^!
+(^!) :: Fractional a => a -> Int -> a
+(^!) = (^)
 
 derivingUnbox "SpreadEnv"
     [t| SpreadEnv -> ( (Double,Double,Double,Double,Double)

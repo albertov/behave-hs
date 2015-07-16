@@ -22,9 +22,13 @@ spec = do
 
 spreadEq :: Spread -> Spread -> Bool
 spreadEq a b = all id [
-    spreadRxInt a `almostEq` spreadRxInt b
-  , spreadSpeed0 a `almostEq` spreadSpeed0 b
-  , spreadHpua a `almostEq` spreadHpua b
+    spreadRxInt        a `almostEq` spreadRxInt        b
+  , spreadSpeed0       a `almostEq` spreadSpeed0       b
+  , spreadHpua         a `almostEq` spreadHpua         b
+  , spreadPhiEffWind   a `almostEq` spreadPhiEffWind   b
+  -- , spreadSpeedMax     a `almostEq` spreadSpeedMax     b
+  -- , spreadAzimuthMax   a `almostEq` spreadAzimuthMax   b
+  -- , spreadEccentricity a `almostEq` spreadEccentricity b
   ]
   where almostEq a' b' = abs (a'-b') < tolerance
         tolerance = 1e-6
@@ -43,7 +47,7 @@ instance Arbitrary Env where
                                 <*> choose (0,1)
                                 <*> choose (0,1)
                                 <*> choose (0,1)
-                                <*> choose (0,100)
+                                <*> choose (0,1000)
                                 <*> choose (0,359)
                                 <*> choose (0,1)
                                 <*> choose (0,359)

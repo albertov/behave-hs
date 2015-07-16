@@ -28,7 +28,7 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
       wood    = realToFrac envWood
       model   = fromIntegral fuel
       windFpm = realToFrac envWindSpeed
-      windDeg = realToFrac envWindBearing
+      windDeg = realToFrac envWindAzimuth
       slope   = realToFrac envSlope
       aspect  = realToFrac envAspect
   [C.block| void {
@@ -69,3 +69,11 @@ standardSpread fuel env = unsafePerformIO $ do
                   Fuel_Spread0((FuelCatalogPtr)$(void *c), $(size_t f))}|]
            <*> d [C.exp|double {
                   Fuel_HeatPerUnitArea((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_PhiEffWind((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_SpreadMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_AzimuthMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_Eccentricity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
