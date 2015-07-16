@@ -8,7 +8,7 @@ import qualified Language.C.Inline.Unsafe as C
 import           Foreign.C.Types
 import           Foreign.Ptr
 import           System.IO.Unsafe (unsafePerformIO)
-import           Behave (SpreadEnv(..), Spread(..))
+import           Behave (SpreadEnv(..), Spread(..), SpreadAtAzimuth(..))
 
 C.include "fireLib.h"
 
@@ -45,10 +45,18 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
                              , $(double slope), $(double aspect));
       double az = Fuel_AzimuthMax( (FuelCatalogPtr)$(void *catalog)
                                   , $(size_t model));
-      size_t w = FIRE_BYRAMS | FIRE_FLAME | FIRE_SCORCH;
+      size_t w = FIRE_BYRAMS | FIRE_FLAME;
       Fire_SpreadAtAzimuth( $(void *catalog), $(size_t model), az, w);
-      return;
-    } |]
+  } |]
+
+setAzimuth :: Catalog -> Int -> Double -> IO ()
+setAzimuth (Catalog catalog) fuel azimuth = do
+  let az    = realToFrac azimuth
+      model = fromIntegral fuel
+  [C.block| void {
+      size_t w = FIRE_BYRAMS | FIRE_FLAME;
+      Fire_SpreadAtAzimuth( $(void *catalog), $(size_t model), $(double az), w);
+  } |]
 
 destroyCatalog :: Catalog -> IO ()
 destroyCatalog (Catalog catalog)
@@ -61,29 +69,37 @@ withCatalog f = do
   destroyCatalog c
   return ret
 
-standardSpread :: Int -> SpreadEnv -> Spread
-standardSpread fuel env = unsafePerformIO $ do
+standardSpread :: Int -> SpreadEnv -> Double -> (Spread, SpreadAtAzimuth)
+standardSpread fuel env azimuth = unsafePerformIO $ do
   let f = fromIntegral fuel
       d = fmap realToFrac
   withCatalog $ \catalog@(Catalog c) -> do
     initFuel catalog fuel env
-    Spread <$> d [C.exp|double {
-                  Fuel_RxIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_Spread0((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_HeatPerUnitArea((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_PhiEffWind((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_SpreadMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_AzimuthMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_Eccentricity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-           <*> d [C.exp|double {
-                  Fuel_ScorchHeight((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+    spread <- Spread
+      <$> d [C.exp|double {
+             Fuel_RxIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_Spread0((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_HeatPerUnitArea((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_PhiEffWind((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_SpreadMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_AzimuthMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_Eccentricity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+    setAzimuth catalog fuel azimuth
+    spreadAz <- SpreadAtAzimuth
+      <$> d [C.exp|double {
+             Fuel_SpreadAny((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+      <*> d [C.exp|double {
+             Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+    return (spread, spreadAz)

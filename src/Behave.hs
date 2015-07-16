@@ -205,21 +205,19 @@ data Spread
     , spreadByramsMax     :: Double -- ^ fireline intensity in dir of max
                                     --   spread(BTU/ft/s)
     , spreadFlameMax      :: Double -- ^ flame length in dir of max spread (ft)
-    , spreadScorchMax     :: Double -- ^ scorch height in dir of max spread (ft)
   } deriving (Eq, Show)
 
 derivingUnbox "Spread"
     [t| Spread -> ( (Double,Double,Double,Double,Double)
-                  , (Double,Double,Double,Double,Double)) |]
-    [| \(Spread a b c d e f g h i j) -> ((a,b,c,d,e),(f,g,h,i,j)) |]
-    [| \((a,b,c,d,e),(f,g,h,i,j)) -> Spread a b c d e f g h i j|]
+                  , (Double,Double,Double,Double)) |]
+    [| \(Spread a b c d e f g h i) -> ((a,b,c,d,e),(f,g,h,i)) |]
+    [| \((a,b,c,d,e),(f,g,h,i)) -> Spread a b c d e f g h i|]
 
 data SpreadAtAzimuth
   = SpreadAtAzimuth {
       spreadSpeed  :: Double -- ^ no-wind, no-slope spread rate (ft/min)
     , spreadByrams :: Double -- ^ fireline intensity (BTU/ft/s)
     , spreadFlame  :: Double -- ^ flame length (ft)
-    , spreadScorch :: Double -- ^ scorch height (ft)
   } deriving (Eq, Show)
 
 spreadAtAzimuth :: Spread -> Double -> SpreadAtAzimuth
@@ -227,8 +225,7 @@ spreadAtAzimuth Spread{..} azimuth
   = SpreadAtAzimuth {
       spreadSpeed  = spreadSpeedMax  * factor
     , spreadByrams = spreadByramsMax * factor
-    , spreadFlame  = spreadFlameMax  * factor
-    , spreadScorch = spreadScorchMax * factor
+    , spreadFlame  = flameLength (spreadByramsMax * factor)
     }
   where
     factor
@@ -243,7 +240,7 @@ spreadAtAzimuth Spread{..} azimuth
 
 
 noSpread :: Spread
-noSpread = Spread 0 0 0 0 0 0 0 0 0 0
+noSpread = Spread 0 0 0 0 0 0 0 0 0
 
 
 data SpreadEnv
@@ -291,7 +288,6 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
     , spreadEccentricity = eccentricity
     , spreadByramsMax    = byrams
     , spreadFlameMax     = flame
-    , spreadScorchMax    = scorch
     }
   where
     Combustion{..}  = fuelCombustion fuel
@@ -350,14 +346,7 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
 
     byrams = combResidenceTime * speedMax * rxInt / 60
 
-    flame
-      | byrams < smidgen = 0
-      | otherwise        = 0.45 * (byrams ** 0.46)
-
-    scorch
-      | byrams < smidgen = 0
-      | otherwise        = (byrams ** 1.166667) / sqrt (byrams + (mph ^! 3))
-      where mph = envWindSpeed / 88
+    flame  = flameLength byrams
 
     (phiEffWind,effWind,speedMax,azimuthMax)
       = case situation of
@@ -423,6 +412,11 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
 
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
+
+flameLength :: Double -> Double
+flameLength byrams
+  | byrams < smidgen = 0
+  | otherwise        = 0.45 * (byrams ** 0.46)
 
 data WindSlopeSituation
   = NoSpread
