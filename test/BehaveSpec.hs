@@ -18,7 +18,8 @@ spec = do
       let Just fuel = catalogIndex standardCatalog code
           computed  = spread fuel env
           expected  = standardSpread code env
-      in traceShow (computed, expected) (computed `spreadEq` expected)
+      in --traceShow (computed, expected)
+         (computed `spreadEq` expected)
 
 spreadEq :: Spread -> Spread -> Bool
 spreadEq a b = all id [
@@ -26,9 +27,9 @@ spreadEq a b = all id [
   , spreadSpeed0       a `almostEq` spreadSpeed0       b
   , spreadHpua         a `almostEq` spreadHpua         b
   , spreadPhiEffWind   a `almostEq` spreadPhiEffWind   b
-  -- , spreadSpeedMax     a `almostEq` spreadSpeedMax     b
-  -- , spreadAzimuthMax   a `almostEq` spreadAzimuthMax   b
-  -- , spreadEccentricity a `almostEq` spreadEccentricity b
+  , spreadSpeedMax     a `almostEq` spreadSpeedMax     b
+  , spreadAzimuthMax   a `almostEq` spreadAzimuthMax   b
+  , spreadEccentricity a `almostEq` spreadEccentricity b
   ]
   where almostEq a' b' = abs (a'-b') < tolerance
         tolerance = 1e-6
