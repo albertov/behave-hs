@@ -30,6 +30,9 @@ spreadEq a b = all id [
   , spreadSpeedMax     a `almostEq` spreadSpeedMax     b
   , spreadAzimuthMax   a `almostEq` spreadAzimuthMax   b
   , spreadEccentricity a `almostEq` spreadEccentricity b
+  , spreadByramsMax    a `almostEq` spreadByramsMax    b
+  , spreadFlameMax     a `almostEq` spreadFlameMax     b
+  , spreadScorchMax    a `almostEq` spreadScorchMax    b
   ]
   where almostEq a' b' = abs (a'-b') < tolerance
         tolerance = 1e-6

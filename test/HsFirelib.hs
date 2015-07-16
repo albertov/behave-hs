@@ -43,6 +43,10 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
       Fire_SpreadWindSlopeMax( $(void *catalog), $(size_t model)
                              , $(double windFpm), $(double windDeg)
                              , $(double slope), $(double aspect));
+      double az = Fuel_AzimuthMax( (FuelCatalogPtr)$(void *catalog)
+                                  , $(size_t model));
+      size_t w = FIRE_BYRAMS | FIRE_FLAME | FIRE_SCORCH;
+      Fire_SpreadAtAzimuth( $(void *catalog), $(size_t model), az, w);
       return;
     } |]
 
@@ -77,3 +81,9 @@ standardSpread fuel env = unsafePerformIO $ do
                   Fuel_AzimuthMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
            <*> d [C.exp|double {
                   Fuel_Eccentricity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
+           <*> d [C.exp|double {
+                  Fuel_ScorchHeight((FuelCatalogPtr)$(void *c), $(size_t f))}|]

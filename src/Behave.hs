@@ -11,7 +11,9 @@ module Behave (
   , Fuel(..)
   , SpreadEnv (..)
   , Spread (..)
+  , SpreadAtAzimuth (..)
   , spread
+  , spreadAtAzimuth
   , standardCatalog
   , catalogIndex
 ) where
@@ -200,15 +202,49 @@ data Spread
     , spreadSpeedMax      :: Double -- ^ spread in direction of max spread
     , spreadAzimuthMax    :: Double -- ^ direction of max spread
     , spreadEccentricity  :: Double -- ^ eccentricity of the ellipse
+    , spreadByramsMax     :: Double -- ^ fireline intensity in dir of max
+                                    --   spread(BTU/ft/s)
+    , spreadFlameMax      :: Double -- ^ flame length in dir of max spread (ft)
+    , spreadScorchMax     :: Double -- ^ scorch height in dir of max spread (ft)
   } deriving (Eq, Show)
 
-noSpread :: Spread
-noSpread = Spread 0 0 0 0 0 0 0
-
 derivingUnbox "Spread"
-    [t| Spread -> ((Double,Double,Double,Double), (Double,Double,Double)) |]
-    [| \(Spread a b c d e f g) -> ((a,b,c,d),(e,f,g)) |]
-    [| \((a,b,c,d),(e,f,g)) -> Spread a b c d e f g|]
+    [t| Spread -> ( (Double,Double,Double,Double,Double)
+                  , (Double,Double,Double,Double,Double)) |]
+    [| \(Spread a b c d e f g h i j) -> ((a,b,c,d,e),(f,g,h,i,j)) |]
+    [| \((a,b,c,d,e),(f,g,h,i,j)) -> Spread a b c d e f g h i j|]
+
+data SpreadAtAzimuth
+  = SpreadAtAzimuth {
+      spreadSpeed  :: Double -- ^ no-wind, no-slope spread rate (ft/min)
+    , spreadByrams :: Double -- ^ fireline intensity (BTU/ft/s)
+    , spreadFlame  :: Double -- ^ flame length (ft)
+    , spreadScorch :: Double -- ^ scorch height (ft)
+  } deriving (Eq, Show)
+
+spreadAtAzimuth :: Spread -> Double -> SpreadAtAzimuth
+spreadAtAzimuth Spread{..} azimuth
+  = SpreadAtAzimuth {
+      spreadSpeed  = spreadSpeedMax  * factor
+    , spreadByrams = spreadByramsMax * factor
+    , spreadFlame  = spreadFlameMax  * factor
+    , spreadScorch = spreadScorchMax * factor
+    }
+  where
+    factor
+      | abs (azimuth - spreadAzimuthMax) < smidgen = 1
+      | otherwise  = (1 - spreadEccentricity) `safeDiv`
+                     (1 - spreadEccentricity * cos (degToRad angle))
+    angle
+      | ret > 180 = 360 - ret
+      | otherwise = ret
+      where ret = abs (spreadAzimuthMax - azimuth)
+
+
+
+noSpread :: Spread
+noSpread = Spread 0 0 0 0 0 0 0 0 0 0
+
 
 data SpreadEnv
   = SpreadEnv {
@@ -253,6 +289,9 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
     , spreadSpeedMax     = speedMax
     , spreadAzimuthMax   = azimuthMax
     , spreadEccentricity = eccentricity
+    , spreadByramsMax    = byrams
+    , spreadFlameMax     = flame
+    , spreadScorchMax    = scorch
     }
   where
     Combustion{..}  = fuelCombustion fuel
@@ -309,6 +348,17 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
       | otherwise             = 0
       where lwRatio = 1 + 0.002840909 * effWind
 
+    byrams = combResidenceTime * speedMax * rxInt / 60
+
+    flame
+      | byrams < smidgen = 0
+      | otherwise        = 0.45 * (byrams ** 0.46)
+
+    scorch
+      | byrams < smidgen = 0
+      | otherwise        = (byrams ** 1.166667) / sqrt (byrams + (mph ^! 3))
+      where mph = envWindSpeed / 88
+
     (phiEffWind,effWind,speedMax,azimuthMax)
       = case situation of
           NoSpread ->
@@ -359,56 +409,6 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
                 | maxWind < smidgen = 0
                 | otherwise         = combWindK * (maxWind ** combWindB)
 
-    {-
-
-    phiEw           = phiWind + phiSlope
-    phiEwOptimal    = speedMax / speed0 - 1
-    phiEw'          = case situation of
-      CrossSlope -> phiEwOptimal
-      _          -> phiEw
-    phiEffWind
-      | checkWindLimit
-      , effectiveWind > maxWind = if maxWind < smidgen
-                                   then 0
-                                   else combWindK * (maxWind ** combWindB)
-      | otherwise               = phiEw'
-    effectiveWind
-      | checkWindLimit = min maxWind ret
-      | otherwise      = ret
-      where
-        ret = case situation of
-          NoSpread      -> 0
-          NoSlopeNoWind -> 0
-          WindNoSlope   -> envWindSpeed
-          SlopeNoWind   -> effWindFromPhiEw
-          UpSlope       -> effWindFromPhiEw
-          CrossSlope    -> if phiEwOptimal > smidgen
-                             then effWindFromPhiEw else 0
-    checkWindLimit = case situation of
-      NoSpread      -> False
-      NoSlopeNoWind -> False
-      WindNoSlope   -> True
-      SlopeNoWind   -> True
-      UpSlope       -> True
-      CrossSlope    -> True
-    speedMax = case situation of
-      NoSpread      -> 0
-      NoSlopeNoWind -> speed0
-      WindNoSlope   -> speed0 * (1+phiEw)
-      SlopeNoWind   -> speed0 * (1+phiEw)
-      UpSlope       -> speed0 * (1+phiEw)
-      CrossSlope    ->
-        let rv      = sqrt (x^!2 + y^!2)
-            x       = slpRate + wndRate + cos (degToRad split)
-            y       = wndRate * sin (degToRad split)
-            wndRate = speed0 * phiWind
-            slpRate = speed0 * phiSlope
-            split
-              | upslope <= envWindAzimuth = envWindAzimuth - upslope
-              | otherwise                 = 3690 - upslope + envWindAzimuth
-        in speed0 + rv
-
-    -}
     situation
       | speed0                      < smidgen = NoSpread
       | phiEw                       < smidgen = NoSlopeNoWind
@@ -416,9 +416,11 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
       | envWindSpeed                < smidgen = SlopeNoWind
       | abs(upslope-envWindAzimuth) < smidgen = UpSlope
       | otherwise                             = CrossSlope
+
     upslope
       | envAspect >= 180 = envAspect - 180
       | otherwise        = envAspect + 180
+
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
 
