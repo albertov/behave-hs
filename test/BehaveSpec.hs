@@ -5,7 +5,7 @@ import Test.Hspec (Spec, hspec, describe)
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (Arbitrary(..), choose)
 import HsFirelib (standardSpread)
-import Debug.Trace
+--import Debug.Trace
 import Behave
 
 main :: IO ()
@@ -19,7 +19,7 @@ spec = do
           computed   = spread fuel env
           computedAz = spreadAtAzimuth computed az
           (expected, expectedAz)   = standardSpread code env az
-      in traceShow (computedAz, expectedAz)
+      in --traceShow (computedAz, expectedAz)
          (computed `spreadEq` expected) && (computedAz `spreadAzEq` expectedAz)
 
 spreadEq :: Spread -> Spread -> Bool

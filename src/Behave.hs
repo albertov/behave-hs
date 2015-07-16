@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Behave (
     Catalog(..)
   , Particle(..)
@@ -22,36 +24,41 @@ import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
+import           Behave.Units
+import qualified Prelude as P
 
 smidgen :: Fractional a => a
 smidgen = 1e-6
 
-safeDiv :: (Ord a, Fractional a) => a -> a -> a
+safeDiv
+  :: (Ord a, Fractional a)
+  => Quantity d1 a -> Quantity d2 a -> Quantity (d1/d2) a
 safeDiv a b
-  | b > smidgen = a / b
-  | otherwise   = 0
+  | b > toQ smidgen = a / b
+  | otherwise       = toQ 0
 
 data Particle
   = Particle {
       partType        :: !ParticleType
-    , partLoad        :: !Double
-    , partSavr        :: !Double
-    , partDensity     :: !Double
-    , partHeat        :: !Double
-    , partSiTotal     :: !Double
-    , partSiEffective :: !Double
+    , partLoad        :: !FuelLoad
+    , partSavr        :: !SaToVolRatio
+    , partDensity     :: !(Density Double)
+    , partHeat        :: !HeatOfCombustion
+    , partSiTotal     :: !TotalMineralContent
+    , partSiEffective :: !EffectiveMineralContent
   } deriving (Eq, Show)
 
 partLife :: Particle -> Life
 partLife Particle{..} = case partType of {ParticleDead -> Dead; _ -> Alive}
 
-partSurfaceArea :: Particle -> Double
+partSurfaceArea :: Particle -> Ratio
 partSurfaceArea Particle{..}
   = partLoad * partSavr `safeDiv` partDensity
 
-partSigmaFactor :: Particle -> Double
+partSigmaFactor :: Particle -> Ratio
 partSigmaFactor Particle {..}
-  = exp ((-138) `safeDiv` partSavr)
+  = exp (((-138) *~ perFoot) `safeDiv` partSavr)
+
 
 partSizeClass :: Particle -> SizeClass
 partSizeClass Particle{..}
@@ -62,8 +69,14 @@ data Life = Dead | Alive deriving (Eq, Show, Enum)
 data SizeClass = SC0 | SC1 | SC2 | SC3 | SC4 | SC5
   deriving (Eq, Show, Enum)
 
-sizeBoundaries :: [(SizeClass, Double)]
-sizeBoundaries = zip [SC0 ..] [1200, 192, 96, 48, 16, 0]
+sizeBoundaries :: [(SizeClass, SaToVolRatio)]
+sizeBoundaries = zip [SC0 ..] [ 1200 *~ perFoot
+                              , 192  *~ perFoot
+                              , 96   *~ perFoot
+                              , 48   *~ perFoot
+                              , 16   *~ perFoot
+                              , 0    *~ perFoot
+                              ]
 
 
 data ParticleType
@@ -78,7 +91,9 @@ derivingUnbox "ParticleType"
     [|toEnum|]
 
 derivingUnbox "Particle"
-    [t| Particle -> ((ParticleType,Double,Double),(Double,Double,Double,Double)) |]
+    [t| Particle -> ( (ParticleType,FuelLoad,SaToVolRatio)
+                    , ( Density Double,HeatOfCombustion
+                      , TotalMineralContent,EffectiveMineralContent)) |]
     [| \(Particle a b c d e f g) -> ((a,b,c),(d,e,f,g)) |]
     [| \((a,b,c),(d,e,f,g)) -> Particle a b c d e f g|]
 
@@ -87,32 +102,34 @@ data Fuel
   = Fuel {
       fuelName      :: !Text                -- ^ name
     , fuelDesc      :: !Text                -- ^ description
-    , fuelDepth     :: !Double              -- ^ total depth
-    , fuelMext      :: !Double              -- ^ moisture of extinction
-    , fuelAdjust    :: !Double              -- ^ adjustment factor
+    , fuelDepth     :: !(Length Double)     -- ^ total depth
+    , fuelMext      :: !Moisture            -- ^ moisture of extinction
+    , fuelAdjust    :: !Ratio               -- ^ adjustment factor
     , fuelParticles :: !(U.Vector Particle) -- ^ particle array
   } deriving (Eq, Show)
 
 lifeParticles :: Life -> U.Vector Particle -> U.Vector Particle
 lifeParticles life = U.filter ((== life) . partLife)
 
-accumBy :: (U.Unbox a, U.Unbox b, Num b) => (a -> b) -> U.Vector a -> b
-accumBy f = U.sum . U.map f
+accumBy
+  :: (U.Unbox a, U.Unbox (Quantity d b), Num b)
+  => (a -> Quantity d b) -> U.Vector a -> Quantity d b
+accumBy f = U.foldl' (+) (toQ 0) . U.map f
 
 accumByLife
-  :: (U.Unbox a, Num a)
-  => U.Vector Particle -> (Particle -> a) -> (Life -> a)
+  :: (U.Unbox (Quantity d a), Num a)
+  => U.Vector Particle -> (Particle -> Quantity d a) -> (Life -> Quantity d a)
 accumByLife ps f life = accumBy f (lifeParticles life ps)
 
 -- Fuel_AreaWtg
-partAreaWtg :: Fuel -> Particle -> Double
+partAreaWtg :: Fuel -> Particle -> Ratio
 partAreaWtg fuel part
   = partSurfaceArea part `safeDiv` accumBy partSurfaceArea sameLifeParticles
   where
     sameLifeParticles = lifeParticles (partLife part) (fuelParticles fuel)
 
 -- Fuel_SizeAreaWtg
-partSizeClassWtg :: Fuel -> Particle -> Double
+partSizeClassWtg :: Fuel -> Particle -> Ratio
 partSizeClassWtg fuel part
  = accumBy (partAreaWtg fuel)
  . U.filter ((== partSizeClass part) . partSizeClass)
@@ -120,17 +137,17 @@ partSizeClassWtg fuel part
 
 data Combustion
   = Combustion {
-      combLifeAreaWtg     :: Life -> Double -- ^ fuel area weighting factor
-    , combLifeRxFactor    :: Life -> Double -- ^ fuel rx factor
-    , combFineDeadFactor  :: Double -- ^ fine dead fuel ratio
-    , combLiveExtFactor   :: Double -- ^ live fuel moisture extinction factor
-    , combFuelBedBulkDens :: Double -- ^ fuel bed bulk density
-    , combResidenceTime   :: Double -- ^ residence time
-    , combFluxRatio       :: Double -- ^ propagating flux ratio
-    , combSlopeK          :: Double -- ^ slope parameter 'k'
-    , combWindB           :: Double -- ^ wind parameter 'b'
-    , combWindE           :: Double -- ^ wind parameter 'e'
-    , combWindK           :: Double -- ^ wind parameter 'k'
+      combLifeAreaWtg     :: Life -> Ratio -- ^ fuel area weighting factor
+    , combLifeRxFactor    :: Life -> Ratio -- ^ fuel rx factor
+    , combFineDeadFactor  :: Ratio -- ^ fine dead fuel ratio
+    , combLiveExtFactor   :: Ratio -- ^ live fuel moisture extinction factor
+    , combFuelBedBulkDens :: Density Double -- ^ fuel bed bulk density
+    , combResidenceTime   :: Time Double -- ^ residence time
+    , combFluxRatio       :: Ratio -- ^ propagating flux ratio
+    , combSlopeK          :: Ratio -- ^ slope parameter 'k'
+    , combWindB           :: Ratio -- ^ wind parameter 'b'
+    , combWindE           :: Ratio -- ^ wind parameter 'e'
+    , combWindK           :: Ratio -- ^ wind parameter 'k'
   }
 
 fuelCombustion :: Fuel -> Combustion
@@ -163,35 +180,45 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     fuelBulkDensity = accumBy' partLoad `safeDiv` fuelDepth fuel
     beta            = accumBy' (\p -> partLoad p `safeDiv` partDensity p)
                     `safeDiv` fuelDepth fuel
-    sigma           = lifeAreaWtg Alive * lifeSavr Alive
-                    + lifeAreaWtg Dead  * lifeSavr Dead
+    sigma :: Ratio
+    sigma           = (lifeAreaWtg Alive * lifeSavr Alive
+                    + lifeAreaWtg Dead  * lifeSavr Dead)
+                    / (1 *~ perFoot)
     lifeRxFactor lf = lifeLoad lf * lifeHeat lf * lifeEtaS lf * gamma
-    gamma           = gammaMax * (ratio ** aa) * exp (aa * (1-ratio))
+    gamma           = gammaMax * (ratio ** aa) * exp (aa * (dl 1 - ratio))
       where
-        gammaMax = sigma15 / (495 + 0.0594*sigma15)
-        sigma15  = sigma ** 1.5
-        aa       = 133 / (sigma ** 0.7913)
-    ratio           = beta / (3.348 / (sigma ** 0.8189))
+        gammaMax = sigma15 / (dl 495 + dl 0.0594 * sigma15)
+        sigma15  = sigma ** dl 1.5
+        aa       = dl 133 / (sigma ** dl 0.7913)
+    ratio           = beta / (dl 3.348 / (sigma ** dl 0.8189))
     lifeEtaS lf
       | lifeSeff lf <= smidgen = 1
       | eta < 1                = eta
       | otherwise              = 1
       where eta = 0.174 / lifeSeff lf ** 0.19
-    residenceTime   = 384 / sigma
+    residenceTime   = (384 *~ second) / sigma
     fluxRatio       = exp ((0.792 + 0.681 * sqrt sigma) * (beta + 0.1))
                     / (192 + 0.2595*sigma)
     slopeK          = 5.275 * (beta ** (-0.3))
-    windB           = 0.02526 * (sigma ** 0.54)
+    windB           = dl 0.02526 * (sigma ** dl 0.54)
     (windK, windE)  = (c * (ratio ** (-e)), (ratio ** e) / c)
-      where c = 7.47  * exp ((-0.133) * (sigma ** 0.55))
-            e = 0.715 * exp ((-0.000359) * sigma)
+      where c = dl 7.47  * exp (dl (-0.133) * (sigma ** dl 0.55))
+            e = dl 0.715 * exp (dl (-0.000359) * sigma)
     fineLive        = accumBy (\p -> partLoad p * exp ((-500) / partSavr p))
                     $ lifeParticles Alive particles
-    fineDead        = accumBy (\p -> partLoad p * partSigmaFactor p)
+    fineDead        = accumBy (\p -> partLoad p / (1*~lbSqFt) * partSigmaFactor p)
                     $ lifeParticles Dead particles
     liveMextFactor  = 2.9 * fineDead `safeDiv` fineLive
-    accumByLife'    = accumByLife particles
+
+    accumBy'
+      :: (U.Unbox (Quantity d b), Num b)
+      => (Particle -> Quantity d b) -> Quantity d b
     accumBy' f      = accumBy f particles
+
+    accumByLife'
+      :: (U.Unbox (Quantity d a), Num a)
+      => (Particle -> Quantity d a) -> (Life -> Quantity d a)
+    accumByLife'    = accumByLife particles
 
 data Spread
   = Spread {
@@ -215,7 +242,7 @@ derivingUnbox "Spread"
 
 data SpreadAtAzimuth
   = SpreadAtAzimuth {
-      spreadSpeed  :: Double -- ^ no-wind, no-slope spread rate (ft/min)
+      spreadSpeed  :: Velocity Double -- ^ no-wind, no-slope spread rate (ft/min)
     , spreadByrams :: Double -- ^ fireline intensity (BTU/ft/s)
     , spreadFlame  :: Double -- ^ flame length (ft)
   } deriving (Eq, Show)
@@ -229,9 +256,9 @@ spreadAtAzimuth Spread{..} azimuth
     }
   where
     factor
-      | abs (azimuth - spreadAzimuthMax) < smidgen = 1
-      | otherwise  = (1 - spreadEccentricity) `safeDiv`
-                     (1 - spreadEccentricity * cos (degToRad angle))
+      | abs (azimuth - spreadAzimuthMax) < smidgen = dl 1
+      | otherwise  = (dl 1 - spreadEccentricity) `safeDiv`
+                     (dl 1 - spreadEccentricity * cos (degToRad angle))
     angle
       | ret > 180 = 360 - ret
       | otherwise = ret
