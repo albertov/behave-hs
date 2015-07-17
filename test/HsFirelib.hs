@@ -23,7 +23,6 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
   let d1hr    = realToFrac envD1hr
       d10hr   = realToFrac envD10hr
       d100hr  = realToFrac envD100hr
-      d1000hr = realToFrac envD1000hr
       herb    = realToFrac envHerb
       wood    = realToFrac envWood
       model   = fromIntegral fuel
@@ -35,7 +34,7 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
       double moisture[6] = { $(double d1hr)
                            , $(double d10hr)
                            , $(double d100hr)
-                           , $(double d1000hr)
+                           , 0
                            , $(double herb)
                            , $(double wood)
                            };

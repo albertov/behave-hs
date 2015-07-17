@@ -15,7 +15,7 @@ spec :: Spec
 spec = do
   describe "Spread" $ do
     prop "behaves like fireLib" $ \(FuelCode code, Env env, Azimuth az) ->
-      let Just fuel = catalogIndex standardCatalog code
+      let Just fuel = indexCatalog standardCatalog code
           computed   = spread fuel env
           computedAz = spreadAtAzimuth computed az
           (expected, expectedAz)   = standardSpread code env az
@@ -59,7 +59,6 @@ instance Arbitrary Azimuth where
 instance Arbitrary Env where
   arbitrary = Env <$> spreadEnv
     where spreadEnv = SpreadEnv <$> choose (0,1)
-                                <*> choose (0,1)
                                 <*> choose (0,1)
                                 <*> choose (0,1)
                                 <*> choose (0,1)
