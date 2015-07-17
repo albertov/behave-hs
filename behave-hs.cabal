@@ -40,11 +40,11 @@ test-suite behave-spec
                      , dimensional-dk
   other-modules:       HsFirelib
   ghc-options:         -Wall -rtsopts
+                       -fwarn-incomplete-patterns
+                       -fwarn-incomplete-uni-patterns
   hs-source-dirs:      test
   c-sources:           test/HsFirelib.c test/fireLib.c
   cc-options:          -Wall
-                       -fwarn-incomplete-patterns
-                       -fwarn-incomplete-uni-patterns
   main-is:             Spec.hs
   default-language:    Haskell2010
 
