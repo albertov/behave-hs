@@ -1,0 +1,6 @@
+cabal configure --enable-optimization                 --disable-library-profiling                 --ghc-options="-O2 \
+                               -fmax-simplifier-iterations=20 \
+                               -funfolding-use-threshold10000 \
+                               -funfolding-keeness-factor100 \
+                               -fexpose-all-unfoldings \
+                               "

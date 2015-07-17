@@ -7,6 +7,7 @@ module Behave (
   , Spread (..)
   , SpreadAtAzimuth (..)
   , spread
+  , mkSpread
   , spreadAtAzimuth
   , standardCatalog
   , indexCatalog
@@ -18,9 +19,15 @@ import Behave.Types
 import Behave.Units 
 import Numeric.Units.Dimensional.DK.Functor ()
 
+mkSpread :: Catalog Fuel -> Int -> Maybe (SpreadEnv -> Spread)
+mkSpread catalog = indexCatalog (fmap spread catalog)
+
 -- | Calculates fire spread paramaters
 spread :: Fuel -> SpreadEnv -> Spread
-spread fuel@Fuel{fuelParticles=particles} env
+spread fuel = spread' fuel (fuelCombustion fuel)
+
+spread' :: Fuel -> Combustion -> SpreadEnv -> Spread
+spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
   | U.null particles = noSpread
   | otherwise        = Spread {
       spreadRxInt        = rxInt        *~ btuSqFtMin
@@ -34,8 +41,6 @@ spread fuel@Fuel{fuelParticles=particles} env
     , spreadFlameMax     = flame
     }
   where
-    Combustion{..}  = fuelCombustion fuel
-
     windSpeed   = envWindSpeed env   /~ footMin
     windAzimuth = envWindAzimuth env /~ degree
     slope       = envSlope env       /~ one
