@@ -8,7 +8,7 @@ import qualified Language.C.Inline.Unsafe as C
 import           Foreign.C.Types
 import           Foreign.Ptr
 import           System.IO.Unsafe (unsafePerformIO)
-import           Behave
+import           Behave (SpreadEnv(..), Spread(..), SpreadAtAzimuth(..))
 import           Behave.Units 
 
 C.include "fireLib.h"

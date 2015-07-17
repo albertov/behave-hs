@@ -4,7 +4,7 @@ module BehaveSpec (main, spec) where
 
 import Test.Hspec (Spec, hspec, describe)
 import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck (Arbitrary(..), choose)
+import Test.QuickCheck (Arbitrary(..), Gen, choose)
 import HsFirelib (standardSpread)
 import Debug.Trace
 import Behave
@@ -46,10 +46,10 @@ spreadAzEq a b = all id [
   , spreadFlame  a `almostEq` spreadFlame   b
   ]
 
-almostEq :: Num a => Quantity d a -> Quantity d a -> Bool
+almostEq :: Quantity d Double -> Quantity d Double -> Bool
 almostEq a b = abs (a'-b') < tolerance
-  where tolerance = 1e-6
-        a', b' :: a
+  where tolerance, a', b' :: Double
+        tolerance = 1e-6
         a' = unsafeCoerce a
         b' = unsafeCoerce b
 
@@ -64,6 +64,7 @@ instance Arbitrary FuelCode where
 instance Arbitrary ArbAzimuth where
   arbitrary = ArbAzimuth <$> bearing
 
+bearing :: Gen Azimuth
 bearing  = fmap (*~degree) (choose (0,359))
 
 instance Arbitrary Env where
