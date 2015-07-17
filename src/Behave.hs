@@ -6,7 +6,6 @@ module Behave (
   , SpreadEnv (..)
   , Spread (..)
   , SpreadAtAzimuth (..)
-  , Combustion (..)
   , spread
   , spreadAtAzimuth
   , standardCatalog
@@ -16,36 +15,43 @@ module Behave (
 
 import qualified Data.Vector.Unboxed as U
 import Behave.Types
+import Behave.Units 
+import Numeric.Units.Dimensional.DK.Functor ()
 
 -- | Calculates fire spread paramaters
 spread :: Fuel -> SpreadEnv -> Spread
-spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
+spread fuel@Fuel{fuelParticles=particles} env
   | U.null particles = noSpread
   | otherwise        = Spread {
-      spreadRxInt        = rxInt
-    , spreadSpeed0       = speed0
-    , spreadHpua         = hpua
-    , spreadPhiEffWind   = phiEffWind
-    , spreadSpeedMax     = speedMax
-    , spreadAzimuthMax   = azimuthMax
-    , spreadEccentricity = eccentricity
+      spreadRxInt        = rxInt        *~ btuSqFtMin
+    , spreadSpeed0       = speed0       *~ footMin
+    , spreadHpua         = hpua         *~ btuSqFt
+    , spreadPhiEffWind   = phiEffWind   *~ one
+    , spreadSpeedMax     = speedMax     *~ footMin
+    , spreadAzimuthMax   = azimuthMax   *~ degree
+    , spreadEccentricity = eccentricity *~ one
     , spreadByramsMax    = byrams
     , spreadFlameMax     = flame
     }
   where
     Combustion{..}  = fuelCombustion fuel
 
+    windSpeed   = envWindSpeed env   /~ footMin
+    windAzimuth = envWindAzimuth env /~ degree
+    slope       = envSlope env       /~ one
+    aspect      = envAspect env      /~ degree
+
     wfmd            = accumBy (\p -> partMoisture p env
                                    * partSigmaFactor p
-                                   * partLoad p)
+                                   * partLoad' p)
                     $ lifeParticles Dead particles
 
-    lifeMext Dead   = fuelMext
+    lifeMext Dead   = fuelMext' fuel
 
     lifeMext Alive
-      | fuelHasLiveParticles fuel = max liveMext fuelMext
+      | fuelHasLiveParticles fuel = max liveMext (fuelMext' fuel)
       | otherwise                 = 0
-      where liveMext = (combLiveExtFactor * (1 - fdmois/fuelMext)) - 0.226
+      where liveMext = (combLiveExtFactor * (1 - fdmois/fuelMext' fuel)) - 0.226
             fdmois   = wfmd `safeDiv` combFineDeadFactor
 
     lifeMoisture    = accumByLife' (\p -> partAreaWtg fuel p
@@ -73,11 +79,11 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
 
     speed0          = rxInt * combFluxRatio `safeDiv` rbQig
 
-    phiSlope        = combSlopeK * (envSlope ^! 2)
+    phiSlope        = combSlopeK * (slope ^! 2)
 
     phiWind
-      | envWindSpeed < smidgen = 0
-      | otherwise              = combWindK * (envWindSpeed ** combWindB)
+      | windSpeed < smidgen = 0
+      | otherwise           = combWindK * (windSpeed ** combWindB)
 
     phiEw = phiWind + phiSlope
 
@@ -87,7 +93,7 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
       | otherwise             = 0
       where lwRatio = 1 + 0.002840909 * effWind
 
-    byrams = combResidenceTime * speedMax * rxInt / 60
+    byrams = (combResidenceTime * speedMax * rxInt / 60) *~ btuFtSec
 
     flame  = flameLength byrams
 
@@ -98,7 +104,7 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
           NoSlopeNoWind ->
             (phiEw, 0, speed0, 0)
           WindNoSlope ->
-            checkWindLimit envWindSpeed phiEw speedMax' envWindAzimuth
+            checkWindLimit windSpeed phiEw speedMax' windAzimuth
           SlopeNoWind -> 
             checkWindLimit (ewFromPhiEw phiEw) phiEw speedMax' upslope
           UpSlope ->
@@ -110,8 +116,8 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
                 wndRate = speed0 * phiWind
                 slpRate = speed0 * phiSlope
                 split
-                  | upslope <= envWindAzimuth = envWindAzimuth - upslope
-                  | otherwise                 = 360 - upslope + envWindAzimuth
+                  | upslope <= windAzimuth = windAzimuth - upslope
+                  | otherwise                 = 360 - upslope + windAzimuth
                 speedMax'' = speed0 + rv
                 phiEw'' = speedMax'' / speed0 - 1
                 effWind'
@@ -144,14 +150,14 @@ spread fuel@Fuel{fuelParticles=particles,..} env@SpreadEnv{..}
     situation
       | speed0                      < smidgen = NoSpread
       | phiEw                       < smidgen = NoSlopeNoWind
-      | envSlope                    < smidgen = WindNoSlope
-      | envWindSpeed                < smidgen = SlopeNoWind
-      | abs(upslope-envWindAzimuth) < smidgen = UpSlope
+      | slope                       < smidgen = WindNoSlope
+      | windSpeed                   < smidgen = SlopeNoWind
+      | abs(upslope-windAzimuth)    < smidgen = UpSlope
       | otherwise                             = CrossSlope
 
     upslope
-      | envAspect >= 180 = envAspect - 180
-      | otherwise        = envAspect + 180
+      | aspect    >= 180 = aspect - 180
+      | otherwise        = aspect + 180
 
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
@@ -165,22 +171,24 @@ data WindSlopeSituation
   | CrossSlope
 
 -- | Calculates fire spread paramateres at a given azimuth
-spreadAtAzimuth :: Spread -> Double -> SpreadAtAzimuth
-spreadAtAzimuth Spread{..} azimuth
+spreadAtAzimuth :: Spread -> Azimuth -> SpreadAtAzimuth
+spreadAtAzimuth Spread{..} az
   = SpreadAtAzimuth {
-      spreadSpeed  = spreadSpeedMax  * factor
-    , spreadByrams = spreadByramsMax * factor
-    , spreadFlame  = flameLength (spreadByramsMax * factor)
+      spreadSpeed  = fmap (*factor) spreadSpeedMax
+    , spreadByrams = fmap (*factor) spreadByramsMax
+    , spreadFlame  = flameLength $ (fmap (*factor) spreadByramsMax)
     }
   where
+    azimuth    = az /~ degree
+    azimuthMax = spreadAzimuthMax /~ degree
+    ecc        = spreadEccentricity /~ one
     factor
-      | abs (azimuth - spreadAzimuthMax) < smidgen = 1
-      | otherwise  = (1 - spreadEccentricity) `safeDiv`
-                     (1 - spreadEccentricity * cos (degToRad angle))
+      | abs (azimuth - azimuthMax) < smidgen = 1
+      | otherwise  = (1 - ecc) `safeDiv` (1 - ecc * cos (degToRad angle))
     angle
       | ret > 180 = 360 - ret
       | otherwise = ret
-      where ret = abs (spreadAzimuthMax - azimuth)
+      where ret = abs (azimuthMax - azimuth)
 
 
 -- | Calculates fuel-dependent parameters
@@ -203,17 +211,17 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     lifeAreaWtg     = accumByLife' ((/totalArea) . partSurfaceArea)
     totalArea       = accumBy' partSurfaceArea
     lifeLoad        = accumByLife' (\p -> partSizeClassWtg fuel p
-                                        * partLoad p
-                                        * (1 - partSiTotal p))
+                                        * partLoad' p
+                                        * (1 - partSiTotal' p))
     lifeSavr        = accumByLife' (\p -> partAreaWtg fuel p
-                                        * partSavr p)
+                                        * partSavr' p)
     lifeHeat        = accumByLife' (\p -> partAreaWtg fuel p
-                                        * partHeat p)
+                                        * partHeat' p)
     lifeSeff        = accumByLife' (\p -> partAreaWtg fuel p
-                                        * partSiEffective p)
-    fuelBulkDensity = accumBy' partLoad `safeDiv` fuelDepth fuel
-    beta            = accumBy' (\p -> partLoad p `safeDiv` partDensity p)
-                    `safeDiv` fuelDepth fuel
+                                        * partSiEffective' p)
+    fuelBulkDensity = accumBy' partLoad' `safeDiv` fuelDepth' fuel
+    beta            = accumBy' (\p -> partLoad' p `safeDiv` partDensity' p)
+                    `safeDiv` fuelDepth' fuel
     sigma           = lifeAreaWtg Alive * lifeSavr Alive
                     + lifeAreaWtg Dead  * lifeSavr Dead
     lifeRxFactor lf = lifeLoad lf * lifeHeat lf * lifeEtaS lf * gamma
@@ -236,29 +244,52 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     (windK, windE)  = (c * (ratio ** (-e)), (ratio ** e) / c)
       where c = 7.47  * exp ((-0.133) * (sigma ** 0.55))
             e = 0.715 * exp ((-0.000359) * sigma)
-    fineLive        = accumBy (\p -> partLoad p * exp ((-500) / partSavr p))
+    fineLive        = accumBy (\p -> partLoad' p * exp ((-500) / partSavr' p))
                     $ lifeParticles Alive particles
-    fineDead        = accumBy (\p -> partLoad p * partSigmaFactor p)
+    fineDead        = accumBy (\p -> partLoad' p * partSigmaFactor p)
                     $ lifeParticles Dead particles
     liveMextFactor  = 2.9 * fineDead `safeDiv` fineLive
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
 
+fuelDepth' :: Fuel -> Double
+fuelDepth' = (/~foot) . fuelDepth
+
+fuelMext' :: Fuel -> Double
+fuelMext' = (/~one) . fuelMext
+
+partDensity' :: Particle -> Double
+partDensity' = (/~lbCuFt) . partDensity
+
+partSiEffective' :: Particle -> Double
+partSiEffective' = (/~one) . partSiEffective
+
+partHeat' :: Particle -> Double
+partHeat' = (/~btuLb) . partHeat
+
+partSavr' :: Particle -> Double
+partSavr' = (/~perFoot) . partSavr
+
+partSiTotal' :: Particle -> Double
+partSiTotal' = (/~one) . partSiTotal
+
+partLoad' :: Particle -> Double
+partLoad' = (/~lbSqFt) . partLoad
 
 partLife :: Particle -> Life
 partLife Particle{..} = case partType of {ParticleDead -> Dead; _ -> Alive}
 
 partSurfaceArea :: Particle -> Double
-partSurfaceArea Particle{..}
-  = partLoad * partSavr `safeDiv` partDensity
+partSurfaceArea p
+  = partLoad' p  * partSavr' p `safeDiv` partDensity' p
 
 partSigmaFactor :: Particle -> Double
-partSigmaFactor Particle {..}
-  = exp ((-138) `safeDiv` partSavr)
+partSigmaFactor p
+  = exp ((-138) `safeDiv` partSavr' p)
 
 partSizeClass :: Particle -> SizeClass
-partSizeClass Particle{..}
-  = fst . head . dropWhile ((>=partSavr) . snd) $ sizeBoundaries
+partSizeClass p
+  = fst . head . dropWhile ((>=partSavr' p) . snd) $ sizeBoundaries
   where
     sizeBoundaries = zip [SC0 ..] [1200, 192, 96, 48, 16, 0]
 
@@ -275,27 +306,29 @@ partSizeClassWtg fuel part
  $ lifeParticles (partLife part) (fuelParticles fuel)
 
 partMoisture :: Particle -> SpreadEnv -> Double
-partMoisture p
-  = case partType p of
-      ParticleHerb -> envHerb
-      ParticleWood -> envWood
-      ParticleDead ->
-        case partSizeClass p of
-          SC0 -> envD1hr
-          SC1 -> envD1hr
-          SC2 -> envD10hr
-          SC3 -> envD10hr
-          SC4 -> envD100hr
-          SC5 -> envD100hr
+partMoisture p = (/~one) . go
+  where
+    go = case partType p of
+            ParticleHerb -> envHerb
+            ParticleWood -> envWood
+            ParticleDead ->
+              case partSizeClass p of
+                SC0 -> envD1hr
+                SC1 -> envD1hr
+                SC2 -> envD10hr
+                SC3 -> envD10hr
+                SC4 -> envD100hr
+                SC5 -> envD100hr
 
 fuelHasLiveParticles :: Fuel -> Bool
 fuelHasLiveParticles
   = not . U.null . U.dropWhile (==ParticleDead) . U.map partType . fuelParticles
 
-flameLength :: Double -> Double
-flameLength byrams
-  | byrams < smidgen = 0
-  | otherwise        = 0.45 * (byrams ** 0.46)
+flameLength :: ByramsIntensity -> Length Double
+flameLength byrams'
+  | byrams < smidgen = _0
+  | otherwise        = (0.45 * (byrams ** 0.46)) *~ foot
+  where byrams = byrams' /~ btuFtSec
 
 --
 -- Utilities 

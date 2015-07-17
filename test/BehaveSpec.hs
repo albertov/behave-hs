@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module BehaveSpec (main, spec) where
 
 import Test.Hspec (Spec, hspec, describe)
@@ -7,6 +8,9 @@ import Test.QuickCheck (Arbitrary(..), choose)
 import HsFirelib (standardSpread)
 import Debug.Trace
 import Behave
+import Behave.Units (Azimuth, (*~), one, footMin, degree)
+import Numeric.Units.Dimensional.DK (Quantity)
+import Unsafe.Coerce (unsafeCoerce)
 
 main :: IO ()
 main = hspec spec
@@ -14,7 +18,7 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "Spread" $ do
-    prop "behaves like fireLib" $ \(FuelCode code, Env env, Azimuth az) ->
+    prop "behaves like fireLib" $ \(FuelCode code, Env env, ArbAzimuth az) ->
       let Just fuel = indexCatalog standardCatalog code
           computed   = spread fuel env
           computedAz = spreadAtAzimuth computed az
@@ -42,28 +46,37 @@ spreadAzEq a b = all id [
   , spreadFlame  a `almostEq` spreadFlame   b
   ]
 
-almostEq :: Double -> Double -> Bool
-almostEq a' b' = abs (a'-b') < tolerance
+almostEq :: Num a => Quantity d a -> Quantity d a -> Bool
+almostEq a b = abs (a'-b') < tolerance
   where tolerance = 1e-6
+        a', b' :: a
+        a' = unsafeCoerce a
+        b' = unsafeCoerce b
+
 
 newtype FuelCode = FuelCode Int deriving (Eq, Show)
 newtype Env = Env SpreadEnv deriving (Eq, Show)
-newtype Azimuth = Azimuth Double deriving (Eq, Show)
+newtype ArbAzimuth = ArbAzimuth Azimuth deriving (Eq, Show)
 
 instance Arbitrary FuelCode where
   arbitrary = FuelCode <$> choose (0,13)
 
-instance Arbitrary Azimuth where
-  arbitrary = Azimuth <$> choose (0,359)
+instance Arbitrary ArbAzimuth where
+  arbitrary = ArbAzimuth <$> bearing
+
+bearing  = fmap (*~degree) (choose (0,359))
 
 instance Arbitrary Env where
   arbitrary = Env <$> spreadEnv
-    where spreadEnv = SpreadEnv <$> choose (0,1)
-                                <*> choose (0,1)
-                                <*> choose (0,1)
-                                <*> choose (0,1)
-                                <*> choose (0,1)
-                                <*> choose (0,1000)
-                                <*> choose (0,359)
-                                <*> choose (0,1)
-                                <*> choose (0,359)
+    where
+      fraction = fmap (*~one) (choose (0,1))
+      speed    = fmap (*~footMin) (choose (0,100))
+      spreadEnv = SpreadEnv <$> fraction
+                            <*> fraction
+                            <*> fraction
+                            <*> fraction
+                            <*> fraction
+                            <*> speed
+                            <*> bearing
+                            <*> fraction
+                            <*> bearing

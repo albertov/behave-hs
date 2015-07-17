@@ -8,7 +8,8 @@ import qualified Language.C.Inline.Unsafe as C
 import           Foreign.C.Types
 import           Foreign.Ptr
 import           System.IO.Unsafe (unsafePerformIO)
-import           Behave (SpreadEnv(..), Spread(..), SpreadAtAzimuth(..))
+import           Behave
+import           Behave.Units 
 
 C.include "fireLib.h"
 
@@ -20,16 +21,16 @@ standardCatalog
 
 initFuel :: Catalog -> Int -> SpreadEnv -> IO ()
 initFuel (Catalog catalog) fuel SpreadEnv{..} = do
-  let d1hr    = realToFrac envD1hr
-      d10hr   = realToFrac envD10hr
-      d100hr  = realToFrac envD100hr
-      herb    = realToFrac envHerb
-      wood    = realToFrac envWood
+  let d1hr    = realToFrac (envD1hr   /~ one)
+      d10hr   = realToFrac (envD10hr  /~ one)
+      d100hr  = realToFrac (envD100hr /~ one)
+      herb    = realToFrac (envHerb   /~ one)
+      wood    = realToFrac (envWood   /~ one)
       model   = fromIntegral fuel
-      windFpm = realToFrac envWindSpeed
-      windDeg = realToFrac envWindAzimuth
-      slope   = realToFrac envSlope
-      aspect  = realToFrac envAspect
+      windFpm = realToFrac (envWindSpeed   /~ footMin)
+      windDeg = realToFrac (envWindAzimuth /~ degree)
+      slope   = realToFrac (envSlope       /~ one)
+      aspect  = realToFrac (envAspect      /~ degree)
   [C.block| void {
       double moisture[6] = { $(double d1hr)
                            , $(double d10hr)
@@ -48,9 +49,9 @@ initFuel (Catalog catalog) fuel SpreadEnv{..} = do
       Fire_SpreadAtAzimuth( $(void *catalog), $(size_t model), az, w);
   } |]
 
-setAzimuth :: Catalog -> Int -> Double -> IO ()
+setAzimuth :: Catalog -> Int -> Azimuth -> IO ()
 setAzimuth (Catalog catalog) fuel azimuth = do
-  let az    = realToFrac azimuth
+  let az    = realToFrac (azimuth /~ degree)
       model = fromIntegral fuel
   [C.block| void {
       size_t w = FIRE_BYRAMS | FIRE_FLAME;
@@ -68,37 +69,37 @@ withCatalog f = do
   destroyCatalog c
   return ret
 
-standardSpread :: Int -> SpreadEnv -> Double -> (Spread, SpreadAtAzimuth)
+standardSpread :: Int -> SpreadEnv -> Azimuth -> (Spread, SpreadAtAzimuth)
 standardSpread fuel env azimuth = unsafePerformIO $ do
   let f = fromIntegral fuel
-      d = fmap realToFrac
+      d g = fmap (g . realToFrac)
   withCatalog $ \catalog@(Catalog c) -> do
     initFuel catalog fuel env
     spread <- Spread
-      <$> d [C.exp|double {
+      <$> d (*~btuSqFtMin) [C.exp|double {
              Fuel_RxIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~footMin) [C.exp|double {
              Fuel_Spread0((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~btuSqFt) [C.exp|double {
              Fuel_HeatPerUnitArea((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~one) [C.exp|double {
              Fuel_PhiEffWind((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~footMin) [C.exp|double {
              Fuel_SpreadMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~degree) [C.exp|double {
              Fuel_AzimuthMax((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~one) [C.exp|double {
              Fuel_Eccentricity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~btuFtSec) [C.exp|double {
              Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~foot) [C.exp|double {
              Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
     setAzimuth catalog fuel azimuth
     spreadAz <- SpreadAtAzimuth
-      <$> d [C.exp|double {
+      <$> d (*~footMin) [C.exp|double {
              Fuel_SpreadAny((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~btuFtSec) [C.exp|double {
              Fuel_ByramsIntensity((FuelCatalogPtr)$(void *c), $(size_t f))}|]
-      <*> d [C.exp|double {
+      <*> d (*~foot) [C.exp|double {
              Fuel_FlameLength((FuelCatalogPtr)$(void *c), $(size_t f))}|]
     return (spread, spreadAz)
