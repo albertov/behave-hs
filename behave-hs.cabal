@@ -22,6 +22,7 @@ library
                      , vector >= 0.11
                      , vector-th-unbox >= 0.2.1.3
                      , dimensional-dk
+                     , dimensional-dk-vector-instances
                      , numtype-dk
   hs-source-dirs:      src
   ghc-options:         -Wall
@@ -38,6 +39,7 @@ test-suite behave-spec
                      , QuickCheck
                      , inline-c
                      , dimensional-dk
+                     , dimensional-dk-vector-instances
   other-modules:       HsFirelib
   ghc-options:         -Wall -rtsopts
                        -fwarn-incomplete-patterns

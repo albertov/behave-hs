@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -43,6 +42,7 @@ module Behave.Units (
 ) where
 
 import           Numeric.Units.Dimensional.DK
+import           Numeric.Units.Dimensional.DK.Vector ()
 import           Numeric.Units.Dimensional.DK.Prelude
 import           Numeric.Units.Dimensional.DK.NonSI as Export
 import           Numeric.Units.Dimensional.DK.SIUnits as Export
@@ -50,7 +50,6 @@ import           Numeric.Units.Dimensional.DK.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
 import           Unsafe.Coerce (unsafeCoerce)
 import qualified Data.Vector.Unboxed as U
-import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 
 {-
     1. Lóngitud
@@ -110,8 +109,3 @@ perFoot  = foot ^ neg1
 
 footMin :: Unit DVelocity Double
 footMin = foot / minute
-
-derivingUnbox "Quantity"
-    [t| forall d a. U.Unbox a => Quantity d a -> a |]
-    [|unsafeCoerce|]
-    [|unsafeCoerce|]
