@@ -21,10 +21,12 @@ import Numeric.Units.Dimensional.DK.Functor ()
 
 mkSpread :: Catalog Fuel -> Int -> Maybe (SpreadEnv -> Spread)
 mkSpread catalog = indexCatalog (fmap spread catalog)
+{-# INLINE mkSpread #-}
 
 -- | Calculates fire spread paramaters
 spread :: Fuel -> SpreadEnv -> Spread
 spread fuel = spread' fuel (fuelCombustion fuel)
+{-# INLINE spread #-}
 
 spread' :: Fuel -> Combustion -> SpreadEnv -> Spread
 spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
@@ -194,6 +196,7 @@ spreadAtAzimuth Spread{..} az
       | ret > 180 = 360 - ret
       | otherwise = ret
       where ret = abs (azimuthMax - azimuth)
+{-# INLINE spreadAtAzimuth #-}
 
 
 -- | Calculates fuel-dependent parameters
@@ -256,6 +259,7 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     liveMextFactor  = 2.9 * fineDead `safeDiv` fineLive
     accumByLife'    = accumByLife particles
     accumBy' f      = accumBy f particles
+{-# INLINE fuelCombustion #-}
 
 fuelDepth' :: Fuel -> Double
 fuelDepth' = (/~foot) . fuelDepth
