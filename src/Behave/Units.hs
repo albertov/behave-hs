@@ -8,11 +8,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Behave.Units (
     module Export
+  , DMoisture
+  , DFraction
+  , DVelocity
+  , DRatio
+  , DAzimuth
+
   , FuelLoad
   , SaToVolRatio
   , HeatOfCombustion
   , HeatPerUnitArea
   , ReactionVelocity
+  , DRatio
   , Ratio
   , Length
   , Dimensionless
@@ -66,6 +73,10 @@ type DHeatOfCombustion      = 'Dim 'Pos2 'Zero 'Neg2 'Zero 'Zero 'Zero 'Zero
 type DHeatPerUnitArea       = 'Dim 'Zero 'Pos1 'Neg2 'Zero 'Zero 'Zero 'Zero
 type DReactionVelocity      = 'Dim 'Zero 'Zero 'Neg1 'Zero 'Zero 'Zero 'Zero
 type DByramsIntensity       = 'Dim 'Pos1 'Pos1 'Neg3 'Zero 'Zero 'Zero 'Zero
+type DRatio                 = DOne
+type DFraction              = DOne
+type DMoisture              = DFraction
+type DAzimuth               = DPlaneAngle
 
 type FuelLoad                = Quantity DFuelLoad Double
 type SaToVolRatio            = Quantity DSaToVolRatio Double
@@ -73,14 +84,14 @@ type HeatOfCombustion        = Quantity DHeatOfCombustion Double
 type HeatPerUnitArea         = Quantity DHeatPerUnitArea Double
 type ReactionVelocity        = Quantity DReactionVelocity Double
 type ByramsIntensity         = Quantity DByramsIntensity Double
-type Ratio                   = Dimensionless Double
-type Fraction                = Dimensionless Double
-type Moisture                = Fraction
+type Ratio                   = Quantity DRatio Double
+type Fraction                = Quantity DFraction Double
+type Moisture                = Quantity DMoisture Double
 type TotalMineralContent     = Fraction
 type EffectiveMineralContent = Fraction
-type Speed                   = Velocity Double
+type Speed                   = Quantity DVelocity Double
 type RateOfSpread            = Speed
-type Azimuth                 = PlaneAngle Double
+type Azimuth                 = Quantity DAzimuth Double
 type ReactionIntensity       = HeatFluxDensity Double
 
 lbSqFt :: Unit DFuelLoad Double
