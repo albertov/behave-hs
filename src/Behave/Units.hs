@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -10,7 +9,6 @@ module Behave.Units (
     module Export
   , DMoisture
   , DFraction
-  , DVelocity
   , DRatio
   , DAzimuth
 
@@ -19,7 +17,6 @@ module Behave.Units (
   , HeatOfCombustion
   , HeatPerUnitArea
   , ReactionVelocity
-  , DRatio
   , Ratio
   , Length
   , Dimensionless
@@ -55,8 +52,8 @@ import           Numeric.Units.Dimensional.DK.NonSI as Export
 import           Numeric.Units.Dimensional.DK.SIUnits as Export
 import           Numeric.Units.Dimensional.DK.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
-import           Unsafe.Coerce (unsafeCoerce)
 import qualified Data.Vector.Unboxed as U
+import           Prelude () -- for instances
 
 {-
     1. Lóngitud
