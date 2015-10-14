@@ -46,7 +46,6 @@ module Behave.Units (
 ) where
 
 import           Numeric.Units.Dimensional.DK
-import           Numeric.Units.Dimensional.DK.Vector ()
 import           Numeric.Units.Dimensional.DK.Prelude
 import           Numeric.Units.Dimensional.DK.NonSI as Export
 import           Numeric.Units.Dimensional.DK.SIUnits as Export

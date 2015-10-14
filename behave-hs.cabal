@@ -27,8 +27,7 @@ library
                      , text
                      , vector >= 0.11
                      , vector-th-unbox >= 0.2.1.3
-                     , dimensional-dk
-                     , dimensional-dk-vector-instances
+                     , dimensional-dk >= 0.8.0.2
                      , numtype-dk
   hs-source-dirs:      src
   ghc-options:         -Wall
