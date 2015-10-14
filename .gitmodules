@@ -4,6 +4,3 @@
 [submodule "submodules/numtype-dk"]
 	path = submodules/numtype-dk
 	url = https://github.com/bjornbm/numtype-dk
-[submodule "submodules/vector-th-unbox"]
-	path = submodules/vector-th-unbox
-	url = git@github.com:albertov/vector-th-unbox.git
