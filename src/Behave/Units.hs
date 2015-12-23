@@ -39,17 +39,20 @@ module Behave.Units (
   , perFoot
   , footMin
   , one
+  , perCent
+  , perOne
   , _0
   , _1
   , (*~)
   , (/~)
 ) where
 
-import           Numeric.Units.Dimensional.DK
-import           Numeric.Units.Dimensional.DK.Prelude
-import           Numeric.Units.Dimensional.DK.NonSI as Export
-import           Numeric.Units.Dimensional.DK.SIUnits as Export
-import           Numeric.Units.Dimensional.DK.Quantities as Export
+import           Numeric.Units.Dimensional
+import           Numeric.Units.Dimensional.UnitNames (atom)
+import           Numeric.Units.Dimensional.Prelude
+import           Numeric.Units.Dimensional.NonSI as Export
+import           Numeric.Units.Dimensional.SIUnits as Export
+import           Numeric.Units.Dimensional.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
 import qualified Data.Vector.Unboxed as U
 import           Prelude () -- for instances
@@ -90,29 +93,38 @@ type RateOfSpread            = Speed
 type Azimuth                 = Quantity DAzimuth Double
 type ReactionIntensity       = HeatFluxDensity Double
 
-lbSqFt :: Unit DFuelLoad Double
+perCent :: Fractional a => Unit 'NonMetric DOne a
+perCent = mkUnitQ name (0.01) one
+  where name = atom "[Per_cent]" "%" "Per cent"
+
+perOne :: Fractional a => Unit 'NonMetric DOne a
+perOne = mkUnitQ name 1.0 one
+  where name = atom "[one]" "one" "Ratio"
+
+btu:: Fractional a => Unit 'NonMetric DEnergy a
+btu = mkUnitQ (atom "[btu]" "btu" "British Thermal Unit") 0.293071 $
+      (watt * hour)
+
+lbSqFt :: Unit 'NonMetric DFuelLoad Double
 lbSqFt = poundMass/(foot ^ pos2)
 
-lbCuFt :: Unit DDensity Double
+lbCuFt :: Unit 'NonMetric DDensity Double
 lbCuFt = poundMass/(foot ^ pos3)
 
-btu:: Unit DEnergy Double
-btu = prefix 0.293071 (watt * hour)
-
-btuLb:: Unit DHeatOfCombustion Double
+btuLb:: Unit 'NonMetric DHeatOfCombustion Double
 btuLb = btu / poundMass
 
-btuFtSec :: Unit DByramsIntensity Double
+btuFtSec :: Unit 'NonMetric DByramsIntensity Double
 btuFtSec = btu / foot / second
 
-btuSqFtMin :: Unit DHeatFluxDensity Double
+btuSqFtMin :: Unit 'NonMetric DHeatFluxDensity Double
 btuSqFtMin = btuSqFt / minute
 
-btuSqFt :: Unit DHeatPerUnitArea Double
-btuSqFt = btu / foot ^ pos2 
+btuSqFt :: Unit 'NonMetric DHeatPerUnitArea Double
+btuSqFt = btu / foot ^ pos2
 
-perFoot :: Unit DSaToVolRatio Double
+perFoot :: Unit 'NonMetric DSaToVolRatio Double
 perFoot  = foot ^ neg1
 
-footMin :: Unit DVelocity Double
+footMin :: Unit 'NonMetric DVelocity Double
 footMin = foot / minute

@@ -7,7 +7,7 @@ import Test.Hspec.QuickCheck (prop)
 import HsFirelib (standardSpread)
 import Debug.Trace
 import Behave
-import Numeric.Units.Dimensional.DK (Quantity)
+import Numeric.Units.Dimensional (Quantity)
 import Unsafe.Coerce (unsafeCoerce)
 import Arbitrary
 

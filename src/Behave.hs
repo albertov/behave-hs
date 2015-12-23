@@ -16,8 +16,8 @@ module Behave (
 
 import qualified Data.Vector.Unboxed as U
 import Behave.Types
-import Behave.Units 
-import Numeric.Units.Dimensional.DK.Functor ()
+import Behave.Units
+import Numeric.Units.Dimensional.Functor ()
 
 mkSpread :: Catalog Fuel -> Int -> Maybe (SpreadEnv -> Spread)
 mkSpread catalog = indexCatalog (fmap spread catalog)
@@ -112,7 +112,7 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
             (phiEw, 0, speed0, 0)
           WindNoSlope ->
             checkWindLimit windSpeed phiEw speedMax' windAzimuth
-          SlopeNoWind -> 
+          SlopeNoWind ->
             checkWindLimit (ewFromPhiEw phiEw) phiEw speedMax' upslope
           UpSlope ->
             checkWindLimit (ewFromPhiEw phiEw) phiEw speedMax' upslope
@@ -340,7 +340,7 @@ flameLength byrams'
   where byrams = byrams' /~ btuFtSec
 
 --
--- Utilities 
+-- Utilities
 --
 smidgen :: Fractional a => a
 smidgen = 1e-6
