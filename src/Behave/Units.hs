@@ -95,7 +95,7 @@ type ReactionIntensity       = HeatFluxDensity Double
 
 perCent :: Fractional a => Unit 'NonMetric DOne a
 perCent = mkUnitQ name (0.01) one
-  where name = atom "[Per_cent]" "%" "Per cent"
+  where name = atom "[%]" "%" "Per cent"
 
 perOne :: Fractional a => Unit 'NonMetric DOne a
 perOne = mkUnitQ name 1.0 one
