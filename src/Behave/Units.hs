@@ -95,14 +95,14 @@ type ReactionIntensity       = HeatFluxDensity Double
 
 perCent :: Fractional a => Unit 'NonMetric DOne a
 perCent = mkUnitQ name (0.01) one
-  where name = atom "[Per_cent]" "%" "Per cent"
+  where name = atom "%" "%" "Per cent"
 
 perOne :: Fractional a => Unit 'NonMetric DOne a
 perOne = mkUnitQ name 1.0 one
-  where name = atom "[one]" "one" "Ratio"
+  where name = atom "one" "one" "Ratio"
 
 btu:: Fractional a => Unit 'NonMetric DEnergy a
-btu = mkUnitQ (atom "[btu]" "btu" "British Thermal Unit") 0.293071 $
+btu = mkUnitQ (atom "btu" "btu" "British Thermal Unit") 0.293071 $
       (watt * hour)
 
 lbSqFt :: Unit 'NonMetric DFuelLoad Double
