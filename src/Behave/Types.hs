@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -funbox-small-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -26,7 +26,7 @@ import qualified Data.Vector as V
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
-    
+
 
 -- | Type of 'Particle'
 data ParticleType
@@ -77,30 +77,30 @@ data Fuel
 
 data Combustion
   = Combustion {
-      combLifeAreaWtg     :: Life -> Double -- ^ fuel area weighting factor
-    , combLifeRxFactor    :: Life -> Double -- ^ fuel rx factor
-    , combFineDeadFactor  :: Double -- ^ fine dead fuel ratio
-    , combLiveExtFactor   :: Double -- ^ live fuel moisture extinction factor
-    , combFuelBedBulkDens :: Double -- ^ fuel bed bulk density
-    , combResidenceTime   :: Double -- ^ residence time
-    , combFluxRatio       :: Double -- ^ propagating flux ratio
-    , combSlopeK          :: Double -- ^ slope parameter 'k'
-    , combWindB           :: Double -- ^ wind parameter 'b'
-    , combWindE           :: Double -- ^ wind parameter 'e'
-    , combWindK           :: Double -- ^ wind parameter 'k'
+      combLifeAreaWtg     :: !(Life -> Double) -- ^ fuel area weighting factor
+    , combLifeRxFactor    :: !(Life -> Double) -- ^ fuel rx factor
+    , combFineDeadFactor  :: !Double -- ^ fine dead fuel ratio
+    , combLiveExtFactor   :: !Double -- ^ live fuel moisture extinction factor
+    , combFuelBedBulkDens :: !Double -- ^ fuel bed bulk density
+    , combResidenceTime   :: !Double -- ^ residence time
+    , combFluxRatio       :: !Double -- ^ propagating flux ratio
+    , combSlopeK          :: !Double -- ^ slope parameter 'k'
+    , combWindB           :: !Double -- ^ wind parameter 'b'
+    , combWindE           :: !Double -- ^ wind parameter 'e'
+    , combWindK           :: !Double -- ^ wind parameter 'k'
   }
 
 data Spread
   = Spread {
-      spreadRxInt         :: ReactionIntensity -- ^ Reaction intensity
-    , spreadSpeed0        :: Speed             -- ^ no-wind, no-slope speed
-    , spreadHpua          :: HeatPerUnitArea   -- ^ heat per unit area
-    , spreadPhiEffWind    :: Ratio             -- ^ combined wind-slope factor
-    , spreadSpeedMax      :: Speed             -- ^ max spread speed
-    , spreadAzimuthMax    :: Azimuth           -- ^ direction of max spread
-    , spreadEccentricity  :: Ratio             -- ^ eccentricity of the ellipse
-    , spreadByramsMax     :: ByramsIntensity   -- ^ max fireline intensity
-    , spreadFlameMax      :: Length Double     -- ^ max flame length
+      spreadRxInt         :: !ReactionIntensity -- ^ Reaction intensity
+    , spreadSpeed0        :: !Speed             -- ^ no-wind, no-slope speed
+    , spreadHpua          :: !HeatPerUnitArea   -- ^ heat per unit area
+    , spreadPhiEffWind    :: !Ratio             -- ^ combined wind-slope factor
+    , spreadSpeedMax      :: !Speed             -- ^ max spread speed
+    , spreadAzimuthMax    :: !Azimuth           -- ^ direction of max spread
+    , spreadEccentricity  :: !Ratio             -- ^ ellipse eccentricity
+    , spreadByramsMax     :: !ByramsIntensity   -- ^ max fireline intensity
+    , spreadFlameMax      :: !(Length Double)   -- ^ max flame length
   } deriving (Eq, Show)
 
 noSpread :: Spread
