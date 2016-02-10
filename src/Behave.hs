@@ -12,6 +12,7 @@ module Behave (
   , standardCatalog
   , indexCatalog
   , mkCatalog
+  , module Behave.Types
 ) where
 
 import qualified Data.Vector.Unboxed as U

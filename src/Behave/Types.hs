@@ -19,8 +19,10 @@ module Behave.Types (
   , standardCatalog
   , indexCatalog
   , mkCatalog
+  , _envWindSpeed
 ) where
 
+import           Control.Lens (makeLensesFor)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
@@ -146,6 +148,9 @@ data SpreadEnv
     , envSlope       :: !Ratio    -- ^ Terrain slope (rise/reach ratio)
     , envAspect      :: !Azimuth  -- ^ Terrain aspect (downslope compass bearing)
   } deriving (Eq, Show)
+makeLensesFor [
+   ("envWindSpeed", "_envWindSpeed")
+  ] ''SpreadEnv
 
 instance Hashable SpreadEnv where
   hashWithSalt s (SpreadEnv a b c d e f g h i) =
