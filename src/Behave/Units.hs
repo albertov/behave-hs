@@ -52,7 +52,7 @@ import           Numeric.Units.Dimensional
 import           Numeric.Units.Dimensional.UnitNames (atom)
 import           Numeric.Units.Dimensional.Prelude
 import           Numeric.Units.Dimensional.Coercion (unQuantity)
-import           Numeric.Units.Dimensional.NonSI as Export
+import           Numeric.Units.Dimensional.NonSI as Export hiding (btu)
 import           Numeric.Units.Dimensional.SIUnits as Export
 import           Numeric.Units.Dimensional.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
@@ -102,6 +102,11 @@ perCent = mkUnitQ name (0.01) one
 perOne :: Fractional a => Unit 'NonMetric DOne a
 perOne = mkUnitQ name 1.0 one
   where name = atom "[one]" "one" "Ratio"
+
+btu :: Fractional a => Unit 'NonMetric DEnergy a
+btu = mkUnitQ name 0.293071 $ (watt * hour)
+  where name = atom "[btu]" "btu" "British Thermal Unit"
+
 
 lbSqFt :: Unit 'NonMetric DFuelLoad Double
 lbSqFt = poundMass/(foot ^ pos2)
