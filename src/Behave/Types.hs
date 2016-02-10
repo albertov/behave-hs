@@ -26,6 +26,7 @@ import qualified Data.Vector as V
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
+import           Data.Hashable (Hashable(..))
 
 
 -- | Type of 'Particle'
@@ -103,6 +104,19 @@ data Spread
     , spreadFlameMax      :: !(Length Double)   -- ^ max flame length
   } deriving (Eq, Show)
 
+instance Hashable Spread where
+  hashWithSalt s (Spread a b c d e f g h i) =
+    s `hashWithSalt` a
+      `hashWithSalt` b
+      `hashWithSalt` c
+      `hashWithSalt` d
+      `hashWithSalt` e
+      `hashWithSalt` f
+      `hashWithSalt` g
+      `hashWithSalt` h
+      `hashWithSalt` i
+  {-# INLINE hashWithSalt #-}
+
 noSpread :: Spread
 noSpread = Spread _0 _0 _0 _0 _0 _0 _0 _0 _0
 
@@ -132,6 +146,19 @@ data SpreadEnv
     , envSlope       :: !Ratio    -- ^ Terrain slope (rise/reach ratio)
     , envAspect      :: !Azimuth  -- ^ Terrain aspect (downslope compass bearing)
   } deriving (Eq, Show)
+
+instance Hashable SpreadEnv where
+  hashWithSalt s (SpreadEnv a b c d e f g h i) =
+    s `hashWithSalt` a
+      `hashWithSalt` b
+      `hashWithSalt` c
+      `hashWithSalt` d
+      `hashWithSalt` e
+      `hashWithSalt` f
+      `hashWithSalt` g
+      `hashWithSalt` h
+      `hashWithSalt` i
+  {-# INLINE hashWithSalt #-}
 
 derivingUnbox "SpreadEnv"
     [t| SpreadEnv -> ( (Moisture,Moisture,Moisture,Moisture,Moisture)

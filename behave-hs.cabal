@@ -28,6 +28,7 @@ library
                      , vector >= 0.11
                      , vector-th-unbox >= 0.2.1.3
                      , dimensional >= 0.8.0.2
+                     , hashable
                      , numtype-dk
   hs-source-dirs:      src
   ghc-options:         -Wall
