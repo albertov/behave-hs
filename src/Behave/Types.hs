@@ -16,6 +16,7 @@ module Behave.Types (
   , SpreadAtAzimuth (..)
   , Combustion (..)
   , noSpread
+  , noSpreadEnv
   , standardCatalog
   , indexCatalog
   , mkCatalog
@@ -151,6 +152,9 @@ data SpreadEnv
 makeLensesFor [
    ("envWindSpeed", "_envWindSpeed")
   ] ''SpreadEnv
+
+noSpreadEnv :: SpreadEnv
+noSpreadEnv = SpreadEnv _0 _0 _0 _0 _0 _0 _0 _0 _0
 
 instance Hashable SpreadEnv where
   hashWithSalt s (SpreadEnv a b c d e f g h i) =
