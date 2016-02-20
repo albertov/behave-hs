@@ -136,6 +136,10 @@ data SpreadAtAzimuth
     , spreadFlame  :: Length Double   -- ^ flame Length
   } deriving (Eq, Show)
 
+derivingUnbox "SpreadAtAzimuth"
+    [t| SpreadAtAzimuth -> (Speed,ByramsIntensity,Length Double) |]
+    [| \(SpreadAtAzimuth a b c) -> (a,b,c) |]
+    [| \(a,b,c) -> SpreadAtAzimuth a b c|]
 
 data SpreadEnv
   = SpreadEnv {

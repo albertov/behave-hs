@@ -7,6 +7,7 @@ module Behave (
   , Spread (..)
   , SpreadAtAzimuth (..)
   , spread
+  , spread'
   , mkSpread
   , spreadAtAzimuth
   , standardCatalog
