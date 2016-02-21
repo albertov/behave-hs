@@ -25,11 +25,11 @@ module Behave.Types (
   , _envWindSpeed
 ) where
 
+import           Control.Arrow ((***))
 import           Control.Lens (makeLensesFor)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
-import qualified Data.Vector.Hybrid as HV
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
@@ -228,13 +228,14 @@ instance HasCatalog  SpreadFunc where
 type PreparedFuel = (Fuel, Combustion)
 
 instance HasCatalog PreparedFuel where
-  newtype Catalog PreparedFuel =
-    PFCatalog (HV.Vector V.Vector U.Vector PreparedFuel)
-  indexCatalog (PFCatalog v) = (G.!?) v
+  newtype Catalog PreparedFuel = PFCatalog (V.Vector Fuel, U.Vector Combustion)
+  indexCatalog (PFCatalog (vf,vc)) i = (,) <$> vf G.!? i
+                                           <*> pure (vc `G.unsafeIndex` i)
   {-# INLINE indexCatalog #-}
-  mkCatalog = PFCatalog . G.fromList
+  mkCatalog = PFCatalog . (G.fromList *** G.fromList) . unzip
   {-# INLINE mkCatalog #-}
-  mapCatalog f (PFCatalog v) = mkCatalog $ map f (G.toList v)
+  mapCatalog f (PFCatalog (vf,vc))
+    = mkCatalog . V.toList . V.map f $ V.zip vf (G.convert vc)
   {-# INLINE mapCatalog #-}
 
 -- | The standard catalog
