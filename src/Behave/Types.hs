@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -14,11 +16,12 @@ module Behave.Types (
   , Spread (..)
   , SpreadAtAzimuth (..)
   , Combustion (..)
+  , HasCatalog (..)
+  , SpreadFunc
   , PreparedFuel
   , noSpread
   , noSpreadEnv
   , standardCatalog
-  , indexCatalog
   , _envWindSpeed
 ) where
 
@@ -26,6 +29,7 @@ import           Control.Lens (makeLensesFor)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
+import qualified Data.Vector.Hybrid as HV
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
@@ -105,7 +109,7 @@ derivingUnbox "Combustion"
     [| \((a,b,c,d,e),(f,g,h,i,j),(k,l,m))
       -> Combustion a b c d e f g h i j k l m|]
 
-type PreparedFuel = (Fuel, Combustion)
+
 
 data Spread
   = Spread {
@@ -192,15 +196,52 @@ derivingUnbox "SpreadEnv"
     [| \(SpreadEnv a b c d e f g h i) -> ((a,b,c,d,e),(f,g,h,i)) |]
     [| \((a,b,c,d,e),(f,g,h,i)) -> SpreadEnv a b c d e f g h i|]
 
-indexCatalog :: G.Vector v a => v a -> Int -> Maybe a
-indexCatalog = (G.!?)
-{-# INLINE indexCatalog #-}
+
+class HasCatalog a where
+  data Catalog a
+  indexCatalog :: Catalog a -> Int -> Maybe a
+  mkCatalog    :: [a] -> Catalog a
+  mapCatalog   :: HasCatalog b => (a -> b) -> Catalog a -> Catalog b
+
+
+instance HasCatalog Fuel where
+  newtype Catalog Fuel = FuelCatalog (V.Vector Fuel)
+    deriving (Eq, Show)
+  indexCatalog (FuelCatalog v) = (G.!?) v
+  {-# INLINE indexCatalog #-}
+  mkCatalog = FuelCatalog . G.fromList
+  {-# INLINE mkCatalog #-}
+  mapCatalog f (FuelCatalog v) = mkCatalog . G.toList $ G.map f v
+  {-# INLINE mapCatalog #-}
+
+type SpreadFunc = SpreadEnv -> Spread
+
+instance HasCatalog  SpreadFunc where
+  newtype Catalog SpreadFunc = SPCatalog (V.Vector SpreadFunc)
+  indexCatalog (SPCatalog v) = (G.!?) v
+  {-# INLINE indexCatalog #-}
+  mkCatalog = SPCatalog . G.fromList
+  {-# INLINE mkCatalog #-}
+  mapCatalog f (SPCatalog v) = mkCatalog . G.toList $ G.map f v
+  {-# INLINE mapCatalog #-}
+
+type PreparedFuel = (Fuel, Combustion)
+
+instance HasCatalog PreparedFuel where
+  newtype Catalog PreparedFuel =
+    PFCatalog (HV.Vector V.Vector U.Vector PreparedFuel)
+  indexCatalog (PFCatalog v) = (G.!?) v
+  {-# INLINE indexCatalog #-}
+  mkCatalog = PFCatalog . G.fromList
+  {-# INLINE mkCatalog #-}
+  mapCatalog f (PFCatalog v) = mkCatalog $ map f (G.toList v)
+  {-# INLINE mapCatalog #-}
 
 -- | The standard catalog
-standardCatalog :: V.Vector Fuel
-standardCatalog = V.imap createFuel fuels
+standardCatalog :: Catalog Fuel
+standardCatalog = FuelCatalog (G.imap createFuel fuels)
   where
-    fuels = V.fromList [
+    fuels = G.fromList [
         ("NoFuel", 0.1, 0.01, "No Combustible Fuel"),
         ("NFFL01", 1.0, 0.12, "Short Grass (1 ft)" ),
         ("NFFL02", 1.0, 0.15, "Timber (grass & understory)"),

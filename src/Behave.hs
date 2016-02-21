@@ -14,21 +14,18 @@ module Behave (
 ) where
 
 import qualified Data.Vector.Unboxed as U
-import qualified Data.Vector.Hybrid as HV
-import qualified Data.Vector.Generic as G
-import qualified Data.Vector as V
 import Behave.Types
 import Behave.Units
 import Numeric.Units.Dimensional.Functor ()
 
-mkSpread :: V.Vector Fuel -> Int -> Maybe (SpreadEnv -> Spread)
-mkSpread catalog = (V.!?) (fmap spread catalog)
+
+mkSpread :: Catalog Fuel -> Int -> Maybe SpreadFunc
+mkSpread catalog = indexCatalog (mapCatalog spread catalog)
 {-# INLINE mkSpread #-}
 
-prepareCatalog :: V.Vector Fuel -> HV.Vector V.Vector U.Vector PreparedFuel
-prepareCatalog fs =
-  G.generate (G.length fs) (\i -> let f = fs `G.unsafeIndex` i
-                                  in (f, fuelCombustion f))
+prepareCatalog :: Catalog Fuel -> Catalog PreparedFuel
+prepareCatalog = mapCatalog (\f -> (f, fuelCombustion f))
+{-# INLINE prepareCatalog #-}
 
 -- | Calculates fire spread paramaters
 spread2 :: PreparedFuel -> SpreadEnv -> Spread
