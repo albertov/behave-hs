@@ -18,6 +18,8 @@ import qualified Data.Vector.Unboxed as U
 import Behave.Types
 import Behave.Units
 import Numeric.Units.Dimensional.Functor ()
+import Numeric.Units.Dimensional.Coercion (unQuantity)
+import Unsafe.Coerce (unsafeCoerce)
 
 
 mkSpread :: Catalog Fuel -> Int -> Maybe SpreadFunc
@@ -47,16 +49,16 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
     , spreadHpua         = hpua         *~ btuSqFt
     , spreadPhiEffWind   = phiEffWind   *~ one
     , spreadSpeedMax     = speedMax     *~ footMin
-    , spreadAzimuthMax   = azimuthMax   *~ degree
+    , spreadAzimuthMax   = unsafeCoerce azimuthMax
     , spreadEccentricity = eccentricity *~ one
     , spreadByramsMax    = byrams
     , spreadFlameMax     = flame
     }
   where
     windSpeed   = envWindSpeed env    /~ footMin
-    windAzimuth = envWindAzimuth env  /~ degree
+    windAzimuth = unQuantity (envWindAzimuth env)
     slope       = envSlope env        /~ one
-    aspect      = envAspect env       /~ degree
+    aspect      = unQuantity (envAspect env)
     residenceTime = combResidenceTime /~ minute
 
     wfmd            = accumBy (\p -> partMoisture p env
@@ -135,13 +137,13 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
             checkWindLimit (ewFromPhiEw phiEw) phiEw speedMax' upslope
           CrossSlope ->
             let rv      = sqrt (x*x + y*y)
-                x       = slpRate + wndRate * cos (degToRad split)
-                y       = wndRate * sin (degToRad split)
+                x       = slpRate + wndRate * cos split
+                y       = wndRate * sin split
                 wndRate = speed0 * phiWind
                 slpRate = speed0 * phiSlope
                 split
                   | upslope <= windAzimuth = windAzimuth - upslope
-                  | otherwise                 = 360 - upslope + windAzimuth
+                  | otherwise                 = 2*pi - upslope + windAzimuth
                 speedMax'' = speed0 + rv
                 phiEw'' = speedMax'' / speed0 - 1
                 effWind'
@@ -154,9 +156,9 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
                   | y >= 0         = pi - al
                   | otherwise      = pi + al
                 azimuthMax'
-                  | ret > 360 = ret - 360
+                  | ret > 2*pi = ret - 2*pi
                   | otherwise = ret
-                  where ret = upslope + radToDeg split'
+                  where ret = upslope + split'
             in checkWindLimit effWind' phiEw'' speedMax'' azimuthMax'
         where
           speedMax' = speed0 * (1 + phiEw)
@@ -180,8 +182,8 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
       | otherwise                             = CrossSlope
 
     upslope
-      | aspect    >= 180 = aspect - 180
-      | otherwise        = aspect + 180
+      | aspect    >= pi = aspect - pi
+      | otherwise       = aspect + pi
 
     accumByLife'    = accumByLife fuel
     accumBy' f      = accumBy f particles
@@ -203,14 +205,14 @@ spreadAtAzimuth Spread{..} az
     , spreadFlame  = flameLength $ (fmap (*factor) spreadByramsMax)
     }
   where
-    azimuth    = az /~ degree
-    azimuthMax = spreadAzimuthMax /~ degree
+    azimuth    = unQuantity az
+    azimuthMax = unQuantity spreadAzimuthMax
     ecc        = spreadEccentricity /~ one
     factor
       | abs (azimuth - azimuthMax) < smidgen = 1
-      | otherwise  = (1 - ecc) `safeDiv` (1 - ecc * cos (degToRad angle))
+      | otherwise  = (1 - ecc) `safeDiv` (1 - ecc * cos angle)
     angle
-      | ret > 180 = 360 - ret
+      | ret > pi = 2*pi - ret
       | otherwise = ret
       where ret = abs (azimuthMax - azimuth)
 {-# INLINE spreadAtAzimuth #-}
@@ -380,14 +382,8 @@ accumByLife
 accumByLife fuel f life = accumBy f (fuelLifeParticles life fuel)
 {-# INLINE accumByLife #-}
 
-
-degToRad :: Double -> Double
-degToRad = (*) 0.017453293
-
-radToDeg :: Double -> Double
-radToDeg = (*) 57.29577951
-
 -- | A monomorphic version of '^'
 infixr 8 ^!
 (^!) :: Fractional a => a -> Int -> a
 (^!) = (^)
+{-# INLINE (^!) #-}

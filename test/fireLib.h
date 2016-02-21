@@ -77,8 +77,8 @@
  */
 
 #define Smidgen                 (0.000001)
-#define DegreesToRadians(x)     ((x)*0.017453293)
-#define RadiansToDegrees(x)     ((x)*57.29577951)
+#define DegreesToRadians(x)     ((x)*1.7453292519943295e-2)
+#define RadiansToDegrees(x)     ((x)*57.29577951308232)
 #define IsZero(x)               (fabs(x)<Smidgen)
 #define Equal(x,y)              (fabs((x)-(y))<Smidgen)
 
