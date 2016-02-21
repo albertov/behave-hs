@@ -7,12 +7,13 @@ module Behave (
   , Spread (..)
   , SpreadAtAzimuth (..)
   , spread
-  , spread'
+  , spread2
   , mkSpread
   , spreadAtAzimuth
   , standardCatalog
   , indexCatalog
   , mkCatalog
+  , prepareCatalog
   , module Behave.Types
 ) where
 
@@ -24,6 +25,14 @@ import Numeric.Units.Dimensional.Functor ()
 mkSpread :: Catalog Fuel -> Int -> Maybe (SpreadEnv -> Spread)
 mkSpread catalog = indexCatalog (fmap spread catalog)
 {-# INLINE mkSpread #-}
+
+prepareCatalog :: Catalog Fuel -> Catalog PreparedFuel
+prepareCatalog = fmap (\f -> (f, fuelCombustion f))
+
+-- | Calculates fire spread paramaters
+spread2 :: PreparedFuel -> SpreadEnv -> Spread
+spread2 (fuel,combustion) = spread' fuel combustion
+{-# INLINE spread2 #-}
 
 -- | Calculates fire spread paramaters
 spread :: Fuel -> SpreadEnv -> Spread
@@ -45,10 +54,11 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
     , spreadFlameMax     = flame
     }
   where
-    windSpeed   = envWindSpeed env   /~ footMin
-    windAzimuth = envWindAzimuth env /~ degree
-    slope       = envSlope env       /~ one
-    aspect      = envAspect env      /~ degree
+    windSpeed   = envWindSpeed env    /~ footMin
+    windAzimuth = envWindAzimuth env  /~ degree
+    slope       = envSlope env        /~ one
+    aspect      = envAspect env       /~ degree
+    residenceTime = combResidenceTime /~ minute
 
     wfmd            = accumBy (\p -> partMoisture p env
                                    * partSigmaFactor p
@@ -84,7 +94,7 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
     rxInt           = combLifeRxFactor Alive * lifeEtaM Alive
                     + combLifeRxFactor Dead  * lifeEtaM Dead
 
-    hpua            = rxInt * combResidenceTime
+    hpua            = rxInt * residenceTime
 
     speed0          = rxInt * combFluxRatio `safeDiv` rbQig
 
@@ -102,7 +112,7 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
       | otherwise             = 0
       where lwRatio = 1 + 0.002840909 * effWind
 
-    byrams = (combResidenceTime * speedMax * rxInt / 60) *~ btuFtSec
+    byrams = (residenceTime * speedMax * rxInt / 60) *~ btuFtSec
 
     flame  = flameLength byrams
 
@@ -210,7 +220,7 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
     , combFineDeadFactor  = fineDead
     , combLiveExtFactor   = liveMextFactor
     , combFuelBedBulkDens = fuelBulkDensity
-    , combResidenceTime   = residenceTime
+    , combResidenceTime   = residenceTime *~ minute
     , combFluxRatio       = fluxRatio
     , combSlopeK          = slopeK
     , combWindB           = windB

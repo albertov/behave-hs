@@ -15,6 +15,7 @@ module Behave.Types (
   , Spread (..)
   , SpreadAtAzimuth (..)
   , Combustion (..)
+  , PreparedFuel
   , noSpread
   , noSpreadEnv
   , standardCatalog
@@ -86,13 +87,15 @@ data Combustion
     , combFineDeadFactor  :: !Double -- ^ fine dead fuel ratio
     , combLiveExtFactor   :: !Double -- ^ live fuel moisture extinction factor
     , combFuelBedBulkDens :: !Double -- ^ fuel bed bulk density
-    , combResidenceTime   :: !Double -- ^ residence time
+    , combResidenceTime   :: !(Time Double)  -- ^ residence time
     , combFluxRatio       :: !Double -- ^ propagating flux ratio
     , combSlopeK          :: !Double -- ^ slope parameter 'k'
     , combWindB           :: !Double -- ^ wind parameter 'b'
     , combWindE           :: !Double -- ^ wind parameter 'e'
     , combWindK           :: !Double -- ^ wind parameter 'k'
   }
+
+type PreparedFuel = (Fuel, Combustion)
 
 data Spread
   = Spread {

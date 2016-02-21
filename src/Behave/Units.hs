@@ -29,6 +29,7 @@ module Behave.Units (
   , RateOfSpread
   , Azimuth
   , ReactionIntensity
+  , Time
   , lbSqFt
   , lbCuFt
   , btu
