@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 module Behave (
     Particle (..)
@@ -38,7 +39,7 @@ spread fuel = spread' fuel (fuelCombustion fuel)
 {-# INLINE spread #-}
 
 spread' :: Fuel -> Combustion -> SpreadEnv -> Spread
-spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
+spread' fuel@(fuelParticles -> particles) Combustion{..} env
   | U.null particles = noSpread
   | otherwise        = Spread {
       spreadRxInt        = rxInt        *~ btuSqFtMin
@@ -61,7 +62,7 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
     wfmd            = accumBy (\p -> partMoisture p env
                                    * partSigmaFactor p
                                    * partLoad' p)
-                    $ lifeParticles Dead particles
+                    $ fuelDeadParticles fuel
 
     lifeMext Dead   = fuelMext' fuel
 
@@ -182,7 +183,7 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
       | aspect    >= 180 = aspect - 180
       | otherwise        = aspect + 180
 
-    accumByLife'    = accumByLife particles
+    accumByLife'    = accumByLife fuel
     accumBy' f      = accumBy f particles
 
 data WindSlopeSituation
@@ -217,7 +218,7 @@ spreadAtAzimuth Spread{..} az
 
 -- | Calculates fuel-dependent parameters
 fuelCombustion :: Fuel -> Combustion
-fuelCombustion fuel@Fuel{fuelParticles=particles}
+fuelCombustion fuel@(fuelParticles -> particles)
   = Combustion {
       combLiveAreaWtg     = lifeAreaWtg Alive
     , combLiveRxFactor    = lifeRxFactor Alive
@@ -271,11 +272,11 @@ fuelCombustion fuel@Fuel{fuelParticles=particles}
       where c = 7.47  * exp ((-0.133) * (sigma ** 0.55))
             e = 0.715 * exp ((-0.000359) * sigma)
     fineLive        = accumBy (\p -> partLoad' p * exp ((-500) / partSavr' p))
-                    $ lifeParticles Alive particles
+                    $ fuelAliveParticles fuel
     fineDead        = accumBy (\p -> partLoad' p * partSigmaFactor p)
-                    $ lifeParticles Dead particles
+                    $ fuelDeadParticles fuel
     liveMextFactor  = 2.9 * fineDead `safeDiv` fineLive
-    accumByLife'    = accumByLife particles
+    accumByLife'    = accumByLife fuel
     accumBy' f      = accumBy f particles
 {-# INLINE fuelCombustion #-}
 
@@ -303,9 +304,6 @@ partSiTotal' = (/~one) . partSiTotal
 partLoad' :: Particle -> Double
 partLoad' = (/~lbSqFt) . partLoad
 
-partLife :: Particle -> Life
-partLife Particle{..} = case partType of {ParticleDead -> Dead; _ -> Alive}
-
 partSurfaceArea :: Particle -> Double
 partSurfaceArea p
   = partLoad' p  * partSavr' p `safeDiv` partDensity' p
@@ -324,13 +322,13 @@ partAreaWtg :: Fuel -> Particle -> Double
 partAreaWtg fuel part
   = partSurfaceArea part `safeDiv` accumBy partSurfaceArea sameLifeParticles
   where
-    sameLifeParticles = lifeParticles (partLife part) (fuelParticles fuel)
+    sameLifeParticles = fuelLifeParticles (partLife part) fuel
 
 partSizeClassWtg :: Fuel -> Particle -> Double
 partSizeClassWtg fuel part
  = accumBy (partAreaWtg fuel)
  . U.filter ((== partSizeClass part) . partSizeClass)
- $ lifeParticles (partLife part) (fuelParticles fuel)
+ $ fuelLifeParticles (partLife part) fuel
 
 partMoisture :: Particle -> SpreadEnv -> Double
 partMoisture p = (/~one) . go
@@ -348,8 +346,7 @@ partMoisture p = (/~one) . go
                 SC5 -> envD100hr
 
 fuelHasLiveParticles :: Fuel -> Bool
-fuelHasLiveParticles
-  = not . U.null . U.dropWhile (==ParticleDead) . U.map partType . fuelParticles
+fuelHasLiveParticles = not . U.null . fuelAliveParticles
 
 flameLength :: ByramsIntensity -> Length Double
 flameLength byrams'
@@ -368,21 +365,21 @@ safeDiv :: (Ord a, Fractional a) => a -> a -> a
 safeDiv a b
   | b > smidgen = a / b
   | otherwise   = 0
+{-# INLINE safeDiv #-}
 
 -- | Accumulates values over a Particle projection
 accumBy :: (U.Unbox a, Num a) => (Particle -> a) -> U.Vector Particle -> a
 accumBy f = U.sum . U.map f
+{-# INLINE accumBy #-}
 
 -- Accumulates values over a Particle projection indexed by their 'Life'
 -- property
 accumByLife
   :: (U.Unbox a, Num a)
-  => U.Vector Particle -> (Particle -> a) -> (Life -> a)
-accumByLife ps f life = accumBy f (lifeParticles life ps)
+  => Fuel -> (Particle -> a) -> (Life -> a)
+accumByLife fuel f life = accumBy f (fuelLifeParticles life fuel)
+{-# INLINE accumByLife #-}
 
--- | Filters particles by the 'Life' property
-lifeParticles :: Life -> U.Vector Particle -> U.Vector Particle
-lifeParticles life = U.filter ((== life) . partLife)
 
 degToRad :: Double -> Double
 degToRad = (*) 0.017453293

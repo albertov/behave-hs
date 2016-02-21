@@ -22,6 +22,10 @@ module Behave.Types (
   , noSpread
   , noSpreadEnv
   , standardCatalog
+  , fuelLifeParticles
+  , fuelParticles
+  , partLife
+  , mkFuel
   , _envWindSpeed
 ) where
 
@@ -48,6 +52,7 @@ derivingUnbox "ParticleType"
     [|fromEnum|]
     [|toEnum|]
 
+data Life = Dead | Alive deriving (Eq, Show, Enum)
 
 -- | A fuel bed particle
 data Particle
@@ -61,13 +66,18 @@ data Particle
     , partSiEffective :: !Fraction         -- ^ effective silica content
   } deriving (Eq, Show)
 
+
+partLife :: Particle -> Life
+partLife p = case partType p of {ParticleDead -> Dead; _ -> Alive}
+{-# INLINE partLife #-}
+
 derivingUnbox "Particle"
     [t| Particle -> ( (ParticleType,FuelLoad,SaToVolRatio)
                     , (Density Double,HeatOfCombustion,Fraction,Fraction)) |]
     [| \(Particle a b c d e f g) -> ((a,b,c),(d,e,f,g)) |]
     [| \((a,b,c),(d,e,f,g)) -> Particle a b c d e f g|]
 
-data Life = Dead | Alive deriving (Eq, Show, Enum)
+
 
 data SizeClass = SC0 | SC1 | SC2 | SC3 | SC4 | SC5
   deriving (Eq, Show, Enum)
@@ -75,13 +85,33 @@ data SizeClass = SC0 | SC1 | SC2 | SC3 | SC4 | SC5
 
 data Fuel
   = Fuel {
-      fuelName      :: !Text                   -- ^ name
-    , fuelDesc      :: !Text                   -- ^ description
-    , fuelDepth     :: !(Length Double)        -- ^ total depth
-    , fuelMext      :: !Moisture               -- ^ moisture of extinction
-    , fuelAdjust    :: !(Dimensionless Double) -- ^ adjustment factor
-    , fuelParticles :: !(U.Vector Particle)    -- ^ particle array
+      fuelName           :: !Text                   -- ^ name
+    , fuelDesc           :: !Text                   -- ^ description
+    , fuelDepth          :: !(Length Double)        -- ^ total depth
+    , fuelMext           :: !Moisture               -- ^ moisture of extinction
+    , fuelAdjust         :: !(Dimensionless Double) -- ^ adjustment factor
+    , fuelAliveParticles :: !(U.Vector Particle)    -- ^ particle array
+    , fuelDeadParticles  :: !(U.Vector Particle)    -- ^ particle array
   } deriving (Eq, Show)
+
+fuelParticles :: Fuel -> U.Vector Particle
+fuelParticles f = fuelAliveParticles f U.++ fuelDeadParticles f
+{-# INLINE fuelParticles #-}
+
+-- | Filters particles by the 'Life' property
+fuelLifeParticles :: Life -> Fuel -> U.Vector Particle
+fuelLifeParticles Alive = fuelAliveParticles
+fuelLifeParticles Dead  = fuelDeadParticles
+{-# INLINE fuelLifeParticles #-}
+
+mkFuel
+  :: Text -> Text -> Length Double -> Moisture -> Dimensionless Double
+  -> U.Vector Particle -> Fuel
+mkFuel name desc depth mext adjust particles =
+  Fuel name desc depth mext adjust liveParts deadParts
+  where
+    (deadParts, liveParts) = U.unstablePartition ((==Dead). partLife) particles
+
 
 data Combustion
   = Combustion {
@@ -299,7 +329,7 @@ standardCatalog = FuelCatalog (G.imap createFuel fuels)
         (13, ParticleDead, 1.0580, 109),
         (13, ParticleDead, 1.2880, 30)
         ]
-    createFuel i (n,d,m,ds)    = Fuel n ds (d*~foot) (m*~one) _1 (mkParts i)
+    createFuel i (n,d,m,ds)    = mkFuel n ds (d*~foot) (m*~one) _1 (mkParts i)
     mkParts :: Int -> U.Vector Particle
     mkParts i                  = U.fromList . map mkPart . filterByIdx i
                                $ particles
