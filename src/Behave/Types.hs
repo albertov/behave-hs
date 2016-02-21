@@ -30,6 +30,7 @@ module Behave.Types (
 ) where
 
 import           Control.Arrow ((***))
+import           Control.DeepSeq (NFData(..))
 import           Control.Lens (makeLensesFor)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
@@ -167,6 +168,11 @@ instance Hashable Spread where
       `hashWithSalt` i
   {-# INLINE hashWithSalt #-}
 
+instance NFData Spread where
+  rnf (Spread a b c d e f g h i)
+    = rnf a `seq` rnf b `seq` rnf c `seq` rnf d `seq` rnf e `seq` rnf f
+            `seq` rnf g `seq` rnf h `seq` rnf i `seq` ()
+
 noSpread :: Spread
 noSpread = Spread _0 _0 _0 _0 _0 _0 _0 _0 _0
 
@@ -219,6 +225,11 @@ instance Hashable SpreadEnv where
       `hashWithSalt` h
       `hashWithSalt` i
   {-# INLINE hashWithSalt #-}
+
+instance NFData SpreadEnv where
+  rnf (SpreadEnv a b c d e f g h i)
+    = rnf a `seq` rnf b `seq` rnf c `seq` rnf d `seq` rnf e `seq` rnf f
+            `seq` rnf g `seq` rnf h `seq` rnf i `seq` ()
 
 derivingUnbox "SpreadEnv"
     [t| SpreadEnv -> ( (Moisture,Moisture,Moisture,Moisture,Moisture)

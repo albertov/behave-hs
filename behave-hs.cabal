@@ -31,6 +31,7 @@ library
                      , hashable
                      , numtype-dk
                      , lens
+                     , deepseq
   hs-source-dirs:      src
   ghc-options:         -Wall
                        -fwarn-incomplete-patterns
