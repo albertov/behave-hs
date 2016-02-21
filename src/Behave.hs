@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Behave (
-    Catalog
-  , Particle (..)
+    Particle (..)
   , Fuel (..)
   , SpreadEnv (..)
   , Spread (..)
@@ -10,24 +9,26 @@ module Behave (
   , spread2
   , mkSpread
   , spreadAtAzimuth
-  , standardCatalog
-  , indexCatalog
-  , mkCatalog
   , prepareCatalog
   , module Behave.Types
 ) where
 
 import qualified Data.Vector.Unboxed as U
+import qualified Data.Vector.Hybrid as HV
+import qualified Data.Vector.Generic as G
+import qualified Data.Vector as V
 import Behave.Types
 import Behave.Units
 import Numeric.Units.Dimensional.Functor ()
 
-mkSpread :: Catalog Fuel -> Int -> Maybe (SpreadEnv -> Spread)
-mkSpread catalog = indexCatalog (fmap spread catalog)
+mkSpread :: V.Vector Fuel -> Int -> Maybe (SpreadEnv -> Spread)
+mkSpread catalog = (V.!?) (fmap spread catalog)
 {-# INLINE mkSpread #-}
 
-prepareCatalog :: Catalog Fuel -> Catalog PreparedFuel
-prepareCatalog = fmap (\f -> (f, fuelCombustion f))
+prepareCatalog :: V.Vector Fuel -> HV.Vector V.Vector U.Vector PreparedFuel
+prepareCatalog fs =
+  G.generate (G.length fs) (\i -> let f = fs `G.unsafeIndex` i
+                                  in (f, fuelCombustion f))
 
 -- | Calculates fire spread paramaters
 spread2 :: PreparedFuel -> SpreadEnv -> Spread
@@ -81,6 +82,12 @@ spread' fuel@Fuel{fuelParticles=particles} Combustion{..} env
                 * partAreaWtg fuel p
                 * combLifeAreaWtg (partLife p)
                 * partSigmaFactor p
+
+    combLifeAreaWtg Alive = combLiveAreaWtg
+    combLifeAreaWtg Dead  = combDeadAreaWtg
+
+    combLifeRxFactor Alive = combLiveRxFactor
+    combLifeRxFactor Dead  = combDeadRxFactor
 
     lifeEtaM lf
       | lifeMoisture lf >= lifeMext lf = 0
@@ -215,8 +222,10 @@ spreadAtAzimuth Spread{..} az
 fuelCombustion :: Fuel -> Combustion
 fuelCombustion fuel@Fuel{fuelParticles=particles}
   = Combustion {
-      combLifeAreaWtg     = lifeAreaWtg
-    , combLifeRxFactor    = lifeRxFactor
+      combLiveAreaWtg     = lifeAreaWtg Alive
+    , combLiveRxFactor    = lifeRxFactor Alive
+    , combDeadAreaWtg     = lifeAreaWtg Dead
+    , combDeadRxFactor    = lifeRxFactor Dead
     , combFineDeadFactor  = fineDead
     , combLiveExtFactor   = liveMextFactor
     , combFuelBedBulkDens = fuelBulkDensity

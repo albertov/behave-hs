@@ -5,8 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Behave.Types (
-    Catalog
-  , Particle (..)
+    Particle (..)
   , ParticleType (..)
   , SizeClass (..)
   , Life (..)
@@ -20,13 +19,13 @@ module Behave.Types (
   , noSpreadEnv
   , standardCatalog
   , indexCatalog
-  , mkCatalog
   , _envWindSpeed
 ) where
 
 import           Control.Lens (makeLensesFor)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
+import qualified Data.Vector.Generic as G
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
@@ -82,8 +81,10 @@ data Fuel
 
 data Combustion
   = Combustion {
-      combLifeAreaWtg     :: !(Life -> Double) -- ^ fuel area weighting factor
-    , combLifeRxFactor    :: !(Life -> Double) -- ^ fuel rx factor
+      combLiveAreaWtg     :: !Double -- ^ fuel area weighting factor
+    , combLiveRxFactor    :: !Double -- ^ fuel rx factor
+    , combDeadAreaWtg     :: !Double -- ^ fuel area weighting factor
+    , combDeadRxFactor    :: !Double -- ^ fuel rx factor
     , combFineDeadFactor  :: !Double -- ^ fine dead fuel ratio
     , combLiveExtFactor   :: !Double -- ^ live fuel moisture extinction factor
     , combFuelBedBulkDens :: !Double -- ^ fuel bed bulk density
@@ -94,6 +95,15 @@ data Combustion
     , combWindE           :: !Double -- ^ wind parameter 'e'
     , combWindK           :: !Double -- ^ wind parameter 'k'
   }
+
+derivingUnbox "Combustion"
+    [t| Combustion -> ( (Double,Double,Double,Double,Double)
+                      , (Double,Double,Time Double,Double, Double)
+                      , (Double,Double,Double)) |]
+    [| \(Combustion a b c d e f g h i j k l m)
+      -> ((a,b,c,d,e),(f,g,h,i,j),(k,l,m)) |]
+    [| \((a,b,c,d,e),(f,g,h,i,j),(k,l,m))
+      -> Combustion a b c d e f g h i j k l m|]
 
 type PreparedFuel = (Fuel, Combustion)
 
@@ -182,22 +192,15 @@ derivingUnbox "SpreadEnv"
     [| \(SpreadEnv a b c d e f g h i) -> ((a,b,c,d,e),(f,g,h,i)) |]
     [| \((a,b,c,d,e),(f,g,h,i)) -> SpreadEnv a b c d e f g h i|]
 
--- | A Collection of fuels or combustion-intermediates
-newtype Catalog a = Catalog (V.Vector a)
-    deriving (Eq, Show, Functor)
-
-indexCatalog :: Catalog a -> Int -> Maybe a
-indexCatalog (Catalog v) = (V.!?) v
+indexCatalog :: G.Vector v a => v a -> Int -> Maybe a
+indexCatalog = (G.!?)
 {-# INLINE indexCatalog #-}
 
-mkCatalog :: [a] -> Catalog a
-mkCatalog = Catalog . V.fromList
-
 -- | The standard catalog
-standardCatalog :: Catalog Fuel
-standardCatalog = mkCatalog $ map createFuel $ zip [0..] fuels
+standardCatalog :: V.Vector Fuel
+standardCatalog = V.imap createFuel fuels
   where
-    fuels = [
+    fuels = V.fromList [
         ("NoFuel", 0.1, 0.01, "No Combustible Fuel"),
         ("NFFL01", 1.0, 0.12, "Short Grass (1 ft)" ),
         ("NFFL02", 1.0, 0.15, "Timber (grass & understory)"),
@@ -254,7 +257,7 @@ standardCatalog = mkCatalog $ map createFuel $ zip [0..] fuels
         (13, ParticleDead, 1.0580, 109),
         (13, ParticleDead, 1.2880, 30)
         ]
-    createFuel (i, (n,d,m,ds)) = Fuel n ds (d*~foot) (m*~one) _1 (mkParts i)
+    createFuel i (n,d,m,ds)    = Fuel n ds (d*~foot) (m*~one) _1 (mkParts i)
     mkParts :: Int -> U.Vector Particle
     mkParts i                  = U.fromList . map mkPart . filterByIdx i
                                $ particles
