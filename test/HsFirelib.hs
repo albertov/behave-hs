@@ -9,7 +9,7 @@ import           Foreign.C.Types
 import           Foreign.Ptr
 import           System.IO.Unsafe (unsafePerformIO)
 import           Behave (SpreadEnv(..), Spread(..), SpreadAtAzimuth(..))
-import           Behave.Units 
+import           Behave.Units
 
 C.include "fireLib.h"
 
@@ -21,16 +21,16 @@ standardCatalog
 
 initFuel :: Catalog -> Int -> SpreadEnv -> IO ()
 initFuel (Catalog catalog) fuel SpreadEnv{..} = do
-  let d1hr    = realToFrac (envD1hr   /~ one)
-      d10hr   = realToFrac (envD10hr  /~ one)
-      d100hr  = realToFrac (envD100hr /~ one)
-      herb    = realToFrac (envHerb   /~ one)
-      wood    = realToFrac (envWood   /~ one)
+  let d1hr    = realToFrac (_seD1hr   /~ one)
+      d10hr   = realToFrac (_seD10hr  /~ one)
+      d100hr  = realToFrac (_seD100hr /~ one)
+      herb    = realToFrac (_seHerb   /~ one)
+      wood    = realToFrac (_seWood   /~ one)
       model   = fromIntegral fuel
-      windFpm = realToFrac (envWindSpeed   /~ footMin)
-      windDeg = realToFrac (envWindAzimuth /~ degree)
-      slope   = realToFrac (envSlope       /~ one)
-      aspect  = realToFrac (envAspect      /~ degree)
+      windFpm = realToFrac (_seWindSpeed   /~ footMin)
+      windDeg = realToFrac (_seWindAzimuth /~ degree)
+      slope   = realToFrac (_seSlope       /~ one)
+      aspect  = realToFrac (_seAspect      /~ degree)
   [C.block| void {
       double moisture[6] = { $(double d1hr)
                            , $(double d10hr)

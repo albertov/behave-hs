@@ -26,12 +26,32 @@ module Behave.Types (
   , fuelParticles
   , partLife
   , mkFuel
-  , _envWindSpeed
+  , seD1hr
+  , seD10hr
+  , seD100hr
+  , seHerb
+  , seWood
+  , seWindSpeed
+  , seWindAzimuth
+  , seSlope
+  , seAspect
+  , sRxInt
+  , sSpeed0
+  , sHpua
+  , sPhiEffWind
+  , sSpeedMax
+  , sAzimuthMax
+  , sEccentricity
+  , sByramsMax
+  , sFlameMax
+  , sSpeed
+  , sByrams
+  , sFlame
 ) where
 
 import           Control.Arrow ((***))
 import           Control.DeepSeq (NFData(..))
-import           Control.Lens (makeLensesFor)
+import           Control.Lens (makeLenses)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
@@ -142,18 +162,19 @@ derivingUnbox "Combustion"
 
 
 
-data Spread
-  = Spread {
-      spreadRxInt         :: !ReactionIntensity -- ^ Reaction intensity
-    , spreadSpeed0        :: !Speed             -- ^ no-wind, no-slope speed
-    , spreadHpua          :: !HeatPerUnitArea   -- ^ heat per unit area
-    , spreadPhiEffWind    :: !Ratio             -- ^ combined wind-slope factor
-    , spreadSpeedMax      :: !Speed             -- ^ max spread speed
-    , spreadAzimuthMax    :: !Azimuth           -- ^ direction of max spread
-    , spreadEccentricity  :: !Ratio             -- ^ ellipse eccentricity
-    , spreadByramsMax     :: !ByramsIntensity   -- ^ max fireline intensity
-    , spreadFlameMax      :: !(Length Double)   -- ^ max flame length
+data Spread =
+  Spread {
+    _sRxInt         :: !ReactionIntensity -- ^ Reaction intensity
+  , _sSpeed0        :: !Speed             -- ^ no-wind, no-slope speed
+  , _sHpua          :: !HeatPerUnitArea   -- ^ heat per unit area
+  , _sPhiEffWind    :: !Ratio             -- ^ combined wind-slope factor
+  , _sSpeedMax      :: !Speed             -- ^ max s speed
+  , _sAzimuthMax    :: !Azimuth           -- ^ direction of max s
+  , _sEccentricity  :: !Ratio             -- ^ ellipse eccentricity
+  , _sByramsMax     :: !ByramsIntensity   -- ^ max fireline intensity
+  , _sFlameMax      :: !(Length Double)   -- ^ max flame length
   } deriving (Eq, Show)
+makeLenses ''Spread
 
 instance Hashable Spread where
   hashWithSalt s (Spread a b c d e f g h i) =
@@ -184,31 +205,30 @@ derivingUnbox "Spread"
 
 data SpreadAtAzimuth
   = SpreadAtAzimuth {
-      spreadSpeed  :: Speed           -- ^ no-wind, no-slope spread rate
-    , spreadByrams :: ByramsIntensity -- ^ fireline intensity
-    , spreadFlame  :: Length Double   -- ^ flame Length
+      _sSpeed  :: Speed           -- ^ no-wind, no-slope s rate
+    , _sByrams :: ByramsIntensity -- ^ fireline intensity
+    , _sFlame  :: Length Double   -- ^ flame Length
   } deriving (Eq, Show)
+makeLenses ''SpreadAtAzimuth
 
 derivingUnbox "SpreadAtAzimuth"
     [t| SpreadAtAzimuth -> (Speed,ByramsIntensity,Length Double) |]
     [| \(SpreadAtAzimuth a b c) -> (a,b,c) |]
     [| \(a,b,c) -> SpreadAtAzimuth a b c|]
 
-data SpreadEnv
-  = SpreadEnv {
-      envD1hr        :: !Moisture -- ^ Moisture of 1hr lag dead particles
-    , envD10hr       :: !Moisture -- ^ Moisture of 10hr lag dead particles
-    , envD100hr      :: !Moisture -- ^ Moisture of 100hr lag dead particles
-    , envHerb        :: !Moisture -- ^ Moisture of live herbaceous particles
-    , envWood        :: !Moisture -- ^ Moisture of live woody particles
-    , envWindSpeed   :: !Speed    -- ^ Wind speed
-    , envWindAzimuth :: !Azimuth  -- ^ Wind azimuth (compass bearing)
-    , envSlope       :: !Ratio    -- ^ Terrain slope (rise/reach ratio)
-    , envAspect      :: !Azimuth  -- ^ Terrain aspect (downslope compass bearing)
+data SpreadEnv =
+  SpreadEnv {
+    _seD1hr        :: !Moisture -- ^ Moisture of 1hr lag dead particles
+  , _seD10hr       :: !Moisture -- ^ Moisture of 10hr lag dead particles
+  , _seD100hr      :: !Moisture -- ^ Moisture of 100hr lag dead particles
+  , _seHerb        :: !Moisture -- ^ Moisture of live herbaceous particles
+  , _seWood        :: !Moisture -- ^ Moisture of live woody particles
+  , _seWindSpeed   :: !Speed    -- ^ Wind speed
+  , _seWindAzimuth :: !Azimuth  -- ^ Wind azimuth (compass bearing)
+  , _seSlope       :: !Ratio    -- ^ Terrain slope (rise/reach ratio)
+  , _seAspect      :: !Azimuth  -- ^ Terrain aspect (downslope compass bearing)
   } deriving (Eq, Show)
-makeLensesFor [
-   ("envWindSpeed", "_envWindSpeed")
-  ] ''SpreadEnv
+makeLenses ''SpreadEnv
 
 noSpreadEnv :: SpreadEnv
 noSpreadEnv = SpreadEnv _0 _0 _0 _0 _0 _0 _0 _0 _0

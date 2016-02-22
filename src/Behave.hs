@@ -44,21 +44,21 @@ spread' :: Fuel -> Combustion -> SpreadEnv -> Spread
 spread' fuel@(fuelParticles -> particles) Combustion{..} env
   | U.null particles = noSpread
   | otherwise        = Spread {
-      spreadRxInt        = rxInt        *~ btuSqFtMin
-    , spreadSpeed0       = speed0       *~ footMin
-    , spreadHpua         = hpua         *~ btuSqFt
-    , spreadPhiEffWind   = phiEffWind   *~ one
-    , spreadSpeedMax     = speedMax     *~ footMin
-    , spreadAzimuthMax   = unsafeCoerce azimuthMax
-    , spreadEccentricity = eccentricity *~ one
-    , spreadByramsMax    = byrams
-    , spreadFlameMax     = flame
+      _sRxInt        = rxInt        *~ btuSqFtMin
+    , _sSpeed0       = speed0       *~ footMin
+    , _sHpua         = hpua         *~ btuSqFt
+    , _sPhiEffWind   = phiEffWind   *~ one
+    , _sSpeedMax     = speedMax     *~ footMin
+    , _sAzimuthMax   = unsafeCoerce azimuthMax
+    , _sEccentricity = eccentricity *~ one
+    , _sByramsMax    = byrams
+    , _sFlameMax     = flame
     }
   where
-    windSpeed   = envWindSpeed env    /~ footMin
-    windAzimuth = unQuantity (envWindAzimuth env)
-    slope       = envSlope env        /~ one
-    aspect      = unQuantity (envAspect env)
+    windSpeed   = _seWindSpeed env    /~ footMin
+    windAzimuth = unQuantity (_seWindAzimuth env)
+    slope       = _seSlope env        /~ one
+    aspect      = unQuantity (_seAspect env)
     residenceTime = combResidenceTime /~ minute
 
     wfmd            = accumBy (\p -> partMoisture p env
@@ -200,14 +200,14 @@ data WindSlopeSituation
 spreadAtAzimuth :: Spread -> Azimuth -> SpreadAtAzimuth
 spreadAtAzimuth Spread{..} az
   = SpreadAtAzimuth {
-      spreadSpeed  = fmap (*factor) spreadSpeedMax
-    , spreadByrams = fmap (*factor) spreadByramsMax
-    , spreadFlame  = flameLength $ (fmap (*factor) spreadByramsMax)
+      _sSpeed  = fmap (*factor) _sSpeedMax
+    , _sByrams = fmap (*factor) _sByramsMax
+    , _sFlame  = flameLength $ (fmap (*factor) _sByramsMax)
     }
   where
     azimuth    = unQuantity az
-    azimuthMax = unQuantity spreadAzimuthMax
-    ecc        = spreadEccentricity /~ one
+    azimuthMax = unQuantity _sAzimuthMax
+    ecc        = _sEccentricity /~ one
     factor
       | abs (azimuth - azimuthMax) < smidgen = 1
       | otherwise  = (1 - ecc) `safeDiv` (1 - ecc * cos angle)
@@ -336,16 +336,16 @@ partMoisture :: Particle -> SpreadEnv -> Double
 partMoisture p = (/~one) . go
   where
     go = case partType p of
-            ParticleHerb -> envHerb
-            ParticleWood -> envWood
+            ParticleHerb -> _seHerb
+            ParticleWood -> _seWood
             ParticleDead ->
               case partSizeClass p of
-                SC0 -> envD1hr
-                SC1 -> envD1hr
-                SC2 -> envD10hr
-                SC3 -> envD10hr
-                SC4 -> envD100hr
-                SC5 -> envD100hr
+                SC0 -> _seD1hr
+                SC1 -> _seD1hr
+                SC2 -> _seD10hr
+                SC3 -> _seD10hr
+                SC4 -> _seD100hr
+                SC5 -> _seD100hr
 
 fuelHasLiveParticles :: Fuel -> Bool
 fuelHasLiveParticles = not . U.null . fuelAliveParticles

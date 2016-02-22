@@ -27,22 +27,22 @@ spec = do
 
 spreadEq :: Spread -> Spread -> Bool
 spreadEq a b = all id [
-    spreadRxInt        a `almostEq` spreadRxInt        b
-  , spreadSpeed0       a `almostEq` spreadSpeed0       b
-  , spreadHpua         a `almostEq` spreadHpua         b
-  , spreadPhiEffWind   a `almostEq` spreadPhiEffWind   b
-  , spreadSpeedMax     a `almostEq` spreadSpeedMax     b
-  , spreadAzimuthMax   a `almostEq` spreadAzimuthMax   b
-  , spreadEccentricity a `almostEq` spreadEccentricity b
-  , spreadByramsMax    a `almostEq` spreadByramsMax    b
-  , spreadFlameMax     a `almostEq` spreadFlameMax     b
+    _sRxInt        a `almostEq` _sRxInt        b
+  , _sSpeed0       a `almostEq` _sSpeed0       b
+  , _sHpua         a `almostEq` _sHpua         b
+  , _sPhiEffWind   a `almostEq` _sPhiEffWind   b
+  , _sSpeedMax     a `almostEq` _sSpeedMax     b
+  , _sAzimuthMax   a `almostEq` _sAzimuthMax   b
+  , _sEccentricity a `almostEq` _sEccentricity b
+  , _sByramsMax    a `almostEq` _sByramsMax    b
+  , _sFlameMax     a `almostEq` _sFlameMax     b
   ]
 
 spreadAzEq :: SpreadAtAzimuth -> SpreadAtAzimuth -> Bool
 spreadAzEq a b = all id [
-    spreadSpeed  a `almostEq` spreadSpeed   b
-  , spreadByrams a `almostEq` spreadByrams  b
-  , spreadFlame  a `almostEq` spreadFlame   b
+    _sSpeed  a `almostEq` _sSpeed   b
+  , _sByrams a `almostEq` _sByrams  b
+  , _sFlame  a `almostEq` _sFlame   b
   ]
 
 almostEq :: Quantity d Double -> Quantity d Double -> Bool
