@@ -59,6 +59,8 @@ import           Data.Vector.Unboxed.Deriving (derivingUnbox)
 import           Data.Text (Text)
 import           Behave.Units
 import           Data.Hashable (Hashable(..))
+import           Foreign.Storable
+import           Foreign.Ptr (Ptr, plusPtr)
 
 
 -- | Type of 'Particle'
@@ -176,6 +178,39 @@ data Spread =
   } deriving (Eq, Show)
 makeLenses ''Spread
 
+instance Storable Spread where
+  {-# INLINE sizeOf #-}
+  sizeOf    _ = sizeOf (undefined :: Double) * 9
+  {-# INLINE alignment #-}
+  alignment _ = alignment (undefined :: Double)
+  {-# INLINE peekElemOff #-}
+  peekElemOff p idx = Spread <$> peekOff' 0
+                             <*> peekOff' 1
+                             <*> peekOff' 2
+                             <*> peekOff' 3
+                             <*> peekOff' 4
+                             <*> peekOff' 5
+                             <*> peekOff' 6
+                             <*> peekOff' 7
+                             <*> peekOff' 8
+    where
+      p' :: Ptr a
+      p' = p `plusPtr` (idx * sizeOf (undefined :: Spread))
+      peekOff' :: Storable a => Int -> IO a
+      peekOff' = peekElemOff p'
+
+  {-# INLINE pokeElemOff #-}
+  pokeElemOff p idx (Spread a b c d e f g h i) =
+    pokeOff' 0 a >> pokeOff' 1 b >> pokeOff' 2 c >> pokeOff' 3 d
+                 >> pokeOff' 4 e >> pokeOff' 5 f >> pokeOff' 6 g
+                 >> pokeOff' 7 h >> pokeOff' 8 i
+    where
+      p' :: Ptr a
+      p' = p `plusPtr` (idx * sizeOf (undefined :: Spread))
+      pokeOff' :: Storable a => Int -> a -> IO ()
+      pokeOff' idx' = pokeElemOff p' idx'
+
+
 instance Hashable Spread where
   hashWithSalt s (Spread a b c d e f g h i) =
     s `hashWithSalt` a
@@ -232,6 +267,39 @@ makeLenses ''SpreadEnv
 
 noSpreadEnv :: SpreadEnv
 noSpreadEnv = SpreadEnv _0 _0 _0 _0 _0 _0 _0 _0 _0
+
+instance Storable SpreadEnv where
+  {-# INLINE sizeOf #-}
+  sizeOf    _ = sizeOf (undefined :: Double) * 9
+  {-# INLINE alignment #-}
+  alignment _ = alignment (undefined :: Double)
+  {-# INLINE peekElemOff #-}
+  peekElemOff p idx =
+    SpreadEnv <$> peekOff' 0
+              <*> peekOff' 1
+              <*> peekOff' 2
+              <*> peekOff' 3
+              <*> peekOff' 4
+              <*> peekOff' 5
+              <*> peekOff' 6
+              <*> peekOff' 7
+              <*> peekOff' 8
+    where
+      p' :: Ptr a
+      p' = p `plusPtr` (idx * sizeOf (undefined :: SpreadEnv))
+      peekOff' :: Storable a => Int -> IO a
+      peekOff' = peekElemOff p'
+
+  {-# INLINE pokeElemOff #-}
+  pokeElemOff p idx (SpreadEnv a b c d e f g h i) =
+    pokeOff' 0 a >> pokeOff' 1 b >> pokeOff' 2 c >> pokeOff' 3 d
+                 >> pokeOff' 4 e >> pokeOff' 5 f >> pokeOff' 6 g
+                 >> pokeOff' 7 h >> pokeOff' 8 i
+    where
+      p' :: Ptr a
+      p' = p `plusPtr` (idx * sizeOf (undefined :: SpreadEnv))
+      pokeOff' :: Storable a => Int -> a -> IO ()
+      pokeOff' idx' = pokeElemOff p' idx'
 
 instance Hashable SpreadEnv where
   hashWithSalt s (SpreadEnv a b c d e f g h i) =
