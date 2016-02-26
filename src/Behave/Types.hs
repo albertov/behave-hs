@@ -49,16 +49,18 @@ module Behave.Types (
   , sFlame
 ) where
 
+import           Behave.Units
+
 import           Control.Arrow ((***))
 import           Control.DeepSeq (NFData(..))
 import           Control.Lens (makeLenses)
+import           Data.Default (Default(def))
+import           Data.Hashable (Hashable(..))
+import           Data.Text (Text)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
 import qualified Data.Vector.Generic as G
 import           Data.Vector.Unboxed.Deriving (derivingUnbox)
-import           Data.Text (Text)
-import           Behave.Units
-import           Data.Hashable (Hashable(..))
 import           Foreign.Storable
 import           Foreign.Ptr (Ptr, plusPtr)
 
@@ -366,6 +368,8 @@ instance HasCatalog PreparedFuel where
   mapCatalog f (PFCatalog (vf,vc))
     = mkCatalog . V.toList . V.map f $ V.zip vf (G.convert vc)
   {-# INLINE mapCatalog #-}
+
+instance Default (Catalog Fuel) where def = standardCatalog
 
 -- | The standard catalog
 standardCatalog :: Catalog Fuel
