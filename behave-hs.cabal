@@ -2,12 +2,12 @@ name:                behave-hs
 version:             0.1.0.0
 synopsis:            Haskell implementation of the BEHAVE algorithms
 -- description:         
-homepage:            https://github.com/meteogrid/behave-hs
+homepage:            https://github.com/albertov/behave-hs
 license:             BSD3
 license-file:        LICENSE
 author:              Alberto Valverde
-maintainer:          alberto@meteogrid.com
-copyright:           2015 Alberto Valverde
+maintainer:          alberto@toscat.net
+copyright:           2015-2016 Alberto Valverde
 category:            Scientific
 build-type:          Simple
 -- extra-source-files:  
