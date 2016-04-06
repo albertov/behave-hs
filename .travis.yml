@@ -19,11 +19,13 @@ before_install:
     export PATH=$HOME/.local/bin:$PATH
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       STACK_URL="https://www.stackage.org/stack/osx-x86_64"
+      travis_retry curl -L $STACK_URL \
+        | tar xz --strip-components=1 -C ~/.local/bin
     else
       STACK_URL="https://www.stackage.org/stack/linux-x86_64"
+      travis_retry curl -L $STACK_URL \
+        | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
     fi
-    travis_retry curl -L $STACK_URL \
-      | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 
 
 script: stack --no-terminal --install-ghc test --haddock
