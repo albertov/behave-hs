@@ -1,0 +1,33 @@
+sudo: false
+
+os:
+  - linux
+  - osx
+
+language: c
+
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+
+before_install:
+  # Download and unpack the stack executable
+  - |
+    set -e
+    mkdir -p ~/.local/bin
+    export PATH=$HOME/.local/bin:$PATH
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      STACK_URL="https://www.stackage.org/stack/osx-x86_64"
+    else
+      STACK_URL="https://www.stackage.org/stack/linux-x86_64"
+    fi
+    travis_retry curl -L $STACK_URL \
+      | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+
+script: stack --no-terminal --install-ghc test --haddock
+
+cache:
+  directories:
+  - $HOME/.stack
