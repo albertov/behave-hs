@@ -400,7 +400,7 @@ typedef struct fuelModelDataStruct
  */
 
 #define FIRE_CATALOG_MAGIC      (19520904L)
-#define FIRE_ERROR_BUFFER_SIZE  (1024)
+#define FIRE_ERROR_BUFFER_SIZE  (512)
 
 typedef struct fuelCatalogStruct
 {
