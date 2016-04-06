@@ -1,6 +1,10 @@
 resolver: lts-5.11
 packages:
 - '.'
+- location:
+    git: https://github.com/bjornbm/dimensional.git
+    commit: eb14ab2207c19fa2214da8eb4522b1f0c70567c1
+  extra-dep: true
 extra-deps: []
 flags: {}
 extra-package-dbs: []
