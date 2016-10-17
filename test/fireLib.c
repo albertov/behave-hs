@@ -1237,7 +1237,7 @@ Fire_FuelCatalogCreate ( name, maxModels )
     size_t maxModels;           /* maximum modelId allowed in this catalog */
 {
     FuelCatalogPtr catalog;
-    static char *blank = {""};
+    static const char *blank = "";
 
     /* Catch a NULL name. */
     if ( name == NULL )
@@ -1512,7 +1512,7 @@ Fire_FuelCatalogDestroy ( catalog )
     /* Finally,free the FuelCatalogData instance and return. */
     free(catalog);
 
-    return (FuelCat_Status(catalog) = FIRE_STATUS_OK);
+    return FIRE_STATUS_OK;
 }
 
 /*
