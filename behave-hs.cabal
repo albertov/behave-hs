@@ -28,12 +28,12 @@ library
                      , deepseq                           >= 1.4.2  && < 1.5
                      , dimensional                       >= 1.0.1  && < 1.1
                      , numtype-dk                        >= 0.5.0  && < 0.6
-                     , vector                            >= 0.11.0 && < 0.12
+                     , vector                            >= 0.11.0 && < 0.13
                      , hashable                          >= 1.2.4  && < 1.3
                      , text                              >= 1.2.2  && < 1.3
                      , lens                              >= 4.14   && < 4.16
                      , vector-th-unbox                   >= 0.2.1  && < 0.3
-                     , QuickCheck                        >= 2.8.2  && < 2.9
+                     , QuickCheck                        >= 2.8.2  && < 2.10
                      , timeit                            >= 1.0.0  && < 1.1
   hs-source-dirs:      src
   ghc-options:         -Wall
@@ -84,19 +84,3 @@ benchmark bench
   ghc-options:         -Wall
                        -fwarn-incomplete-patterns
                        -fwarn-incomplete-uni-patterns
-
-executable prueba
-  build-depends:   
-                       base
-                     , behave-hs
-                     , QuickCheck
-                     , dimensional
-                     , vector
-                     , timeit
-                     , deepseq
-  other-modules:       Arbitrary
-  ghc-options:         -Wall -rtsopts
-  hs-source-dirs:      test
-  cc-options:          -Wall
-  main-is:             Prueba.hs
-  default-language:    Haskell2010
