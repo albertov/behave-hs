@@ -24,21 +24,17 @@ import Unsafe.Coerce (unsafeCoerce)
 
 mkSpread :: Catalog Fuel -> Int -> Maybe SpreadFunc
 mkSpread catalog = indexCatalog (mapCatalog spread catalog)
-{-# INLINE mkSpread #-}
 
 prepareCatalog :: Catalog Fuel -> Catalog PreparedFuel
 prepareCatalog = mapCatalog (\f -> (f, fuelCombustion f))
-{-# INLINE prepareCatalog #-}
 
 -- | Calculates fire spread paramaters
 spread2 :: PreparedFuel -> SpreadEnv -> Spread
 spread2 (fuel,combustion) = spread' fuel combustion
-{-# INLINE spread2 #-}
 
 -- | Calculates fire spread paramaters
 spread :: Fuel -> SpreadEnv -> Spread
 spread fuel = spread' fuel (fuelCombustion fuel)
-{-# INLINE spread #-}
 
 spread' :: Fuel -> Combustion -> SpreadEnv -> Spread
 spread' fuel@(fuelParticles -> particles) Combustion{..} env
@@ -215,7 +211,6 @@ spreadAtAzimuth Spread{..} az
       | ret > pi = 2*pi - ret
       | otherwise = ret
       where ret = abs (azimuthMax - azimuth)
-{-# INLINE spreadAtAzimuth #-}
 
 
 -- | Calculates fuel-dependent parameters
@@ -280,7 +275,6 @@ fuelCombustion fuel@(fuelParticles -> particles)
     liveMextFactor  = 2.9 * fineDead `safeDiv` fineLive
     accumByLife'    = accumByLife fuel
     accumBy' f      = accumBy f particles
-{-# INLINE fuelCombustion #-}
 
 fuelDepth' :: Fuel -> Double
 fuelDepth' = (/~foot) . fuelDepth
