@@ -48,18 +48,14 @@ module Behave.Units (
   , (/~)
 ) where
 
-import           Data.Hashable (Hashable(..))
 import           Numeric.Units.Dimensional
 import           Numeric.Units.Dimensional.UnitNames (atom)
 import           Numeric.Units.Dimensional.Prelude
-import           Numeric.Units.Dimensional.NonSI as Export hiding (btu)
+import           Numeric.Units.Dimensional.NonSI as Export
 import           Numeric.Units.Dimensional.SIUnits as Export
 import           Numeric.Units.Dimensional.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
-import qualified Data.Vector.Unboxed as U
 import           Prelude () -- for instances
-
-import           Unsafe.Coerce (unsafeCoerce)
 
 {-
     1. Lóngitud
@@ -98,16 +94,16 @@ type Azimuth                 = Quantity DAzimuth Double
 type ReactionIntensity       = HeatFluxDensity Double
 
 perCent :: Fractional a => Unit 'NonMetric DOne a
-perCent = mkUnitQ name (0.01) one
-  where name = atom "[%]" "%" "Per cent"
+perCent = mkUnitQ n 0.01 one
+  where n = atom "[%]" "%" "Per cent"
 
 perOne :: Fractional a => Unit 'NonMetric DOne a
-perOne = mkUnitQ name 1.0 one
-  where name = atom "[one]" "one" "Ratio"
+perOne = mkUnitQ n 1.0 one
+  where n = atom "[one]" "one" "Ratio"
 
 btu :: Fractional a => Unit 'NonMetric DEnergy a
-btu = mkUnitQ name 0.293071 $ (watt * hour)
-  where name = atom "[btu]" "btu" "British Thermal Unit"
+btu = mkUnitQ n 0.293071 (watt * hour)
+  where n = atom "[btu]" "btu" "British Thermal Unit"
 
 
 lbSqFt :: Unit 'NonMetric DFuelLoad Double
@@ -133,6 +129,3 @@ perFoot  = foot ^ neg1
 
 footMin :: Unit 'NonMetric DVelocity Double
 footMin = foot / minute
-
-instance Hashable a => Hashable (Quantity d a) where
-  hashWithSalt s = hashWithSalt s . (unsafeCoerce :: Quantity d a -> a)

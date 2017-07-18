@@ -55,7 +55,6 @@ import           Control.Arrow ((***))
 import           Control.DeepSeq (NFData(..))
 import           Control.Lens (makeLenses)
 import           Data.Default (Default(def))
-import           Data.Hashable (Hashable(..))
 import           Data.Text (Text)
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector as V
@@ -213,19 +212,6 @@ instance Storable Spread where
       pokeOff' idx' = pokeElemOff p' idx'
 
 
-instance Hashable Spread where
-  hashWithSalt s (Spread a b c d e f g h i) =
-    s `hashWithSalt` a
-      `hashWithSalt` b
-      `hashWithSalt` c
-      `hashWithSalt` d
-      `hashWithSalt` e
-      `hashWithSalt` f
-      `hashWithSalt` g
-      `hashWithSalt` h
-      `hashWithSalt` i
-  {-# INLINE hashWithSalt #-}
-
 instance NFData Spread where
   rnf (Spread a b c d e f g h i)
     = rnf a `seq` rnf b `seq` rnf c `seq` rnf d `seq` rnf e `seq` rnf f
@@ -302,19 +288,6 @@ instance Storable SpreadEnv where
       p' = p `plusPtr` (idx * sizeOf (undefined :: SpreadEnv))
       pokeOff' :: Storable a => Int -> a -> IO ()
       pokeOff' idx' = pokeElemOff p' idx'
-
-instance Hashable SpreadEnv where
-  hashWithSalt s (SpreadEnv a b c d e f g h i) =
-    s `hashWithSalt` a
-      `hashWithSalt` b
-      `hashWithSalt` c
-      `hashWithSalt` d
-      `hashWithSalt` e
-      `hashWithSalt` f
-      `hashWithSalt` g
-      `hashWithSalt` h
-      `hashWithSalt` i
-  {-# INLINE hashWithSalt #-}
 
 instance NFData SpreadEnv where
   rnf (SpreadEnv a b c d e f g h i)
