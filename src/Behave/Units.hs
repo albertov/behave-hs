@@ -52,13 +52,14 @@ import           Data.Hashable (Hashable(..))
 import           Numeric.Units.Dimensional
 import           Numeric.Units.Dimensional.UnitNames (atom)
 import           Numeric.Units.Dimensional.Prelude
-import           Numeric.Units.Dimensional.Coercion (unQuantity)
 import           Numeric.Units.Dimensional.NonSI as Export hiding (btu)
 import           Numeric.Units.Dimensional.SIUnits as Export
 import           Numeric.Units.Dimensional.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
 import qualified Data.Vector.Unboxed as U
 import           Prelude () -- for instances
+
+import           Unsafe.Coerce (unsafeCoerce)
 
 {-
     1. Lóngitud
@@ -134,4 +135,4 @@ footMin :: Unit 'NonMetric DVelocity Double
 footMin = foot / minute
 
 instance Hashable a => Hashable (Quantity d a) where
-  hashWithSalt s = hashWithSalt s . unQuantity
+  hashWithSalt s = hashWithSalt s . (unsafeCoerce :: Quantity d a -> a)

@@ -18,9 +18,6 @@ import qualified Data.Vector.Unboxed as U
 import Behave.Types
 import Behave.Units
 import Numeric.Units.Dimensional.Functor ()
-import Numeric.Units.Dimensional.Coercion (unQuantity)
-import Unsafe.Coerce (unsafeCoerce)
-
 
 mkSpread :: Catalog Fuel -> Int -> Maybe SpreadFunc
 mkSpread catalog = indexCatalog (mapCatalog spread catalog)
@@ -45,16 +42,16 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
     , _sHpua         = hpua         *~ btuSqFt
     , _sPhiEffWind   = phiEffWind   *~ one
     , _sSpeedMax     = speedMax     *~ footMin
-    , _sAzimuthMax   = unsafeCoerce azimuthMax
+    , _sAzimuthMax   = azimuthMax   *~ radian
     , _sEccentricity = eccentricity *~ one
     , _sByramsMax    = byrams
     , _sFlameMax     = flame
     }
   where
     windSpeed   = _seWindSpeed env    /~ footMin
-    windAzimuth = unQuantity (_seWindAzimuth env)
+    windAzimuth = _seWindAzimuth env  /~ radian
     slope       = _seSlope env        /~ one
-    aspect      = unQuantity (_seAspect env)
+    aspect      = _seAspect env       /~ radian
     residenceTime = combResidenceTime /~ minute
 
     wfmd            = accumBy (\p -> partMoisture p env
@@ -92,7 +89,7 @@ spread' fuel@(fuelParticles -> particles) Combustion{..} env
                                        + 5.11 * rt^!2
                                        - 3.52 * rt^!3
       | otherwise                      = 0
-      where rt = (lifeMoisture lf / lifeMext lf)
+      where rt = lifeMoisture lf / lifeMext lf
 
     rxInt           = combLifeRxFactor Alive * lifeEtaM Alive
                     + combLifeRxFactor Dead  * lifeEtaM Dead
@@ -198,11 +195,11 @@ spreadAtAzimuth Spread{..} az
   = SpreadAtAzimuth {
       _sSpeed  = fmap (*factor) _sSpeedMax
     , _sByrams = fmap (*factor) _sByramsMax
-    , _sFlame  = flameLength $ (fmap (*factor) _sByramsMax)
+    , _sFlame  = flameLength (fmap (*factor) _sByramsMax)
     }
   where
-    azimuth    = unQuantity az
-    azimuthMax = unQuantity _sAzimuthMax
+    azimuth    = az /~ radian
+    azimuthMax = _sAzimuthMax /~ radian
     ecc        = _sEccentricity /~ one
     factor
       | abs (azimuth - azimuthMax) < smidgen = 1
