@@ -51,7 +51,7 @@ module Behave.Units (
 import           Numeric.Units.Dimensional
 import           Numeric.Units.Dimensional.UnitNames (atom)
 import           Numeric.Units.Dimensional.Prelude
-import           Numeric.Units.Dimensional.NonSI as Export
+import           Numeric.Units.Dimensional.NonSI as Export hiding (btu)
 import           Numeric.Units.Dimensional.SIUnits as Export
 import           Numeric.Units.Dimensional.Quantities as Export
 import           Numeric.NumType.DK.Integers (TypeInt(..))
